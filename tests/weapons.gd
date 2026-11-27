@@ -22,6 +22,7 @@ func _run() -> void:
 	await _test_weight()
 	await _test_switching()
 	await _test_specials()
+	await _test_shoulder_carry()
 	print("Weapons: %d/%d checks passed." % [_checks - _failures, _checks])
 	quit(0 if _failures == 0 else 1)
 
@@ -177,6 +178,23 @@ func _test_specials() -> void:
 	_hero.start_light()
 	_check(_hero.attack != null and _hero.attack.damage_type == DuelAttack.DamageType.IMPACT,
 		"without focus the staff falls back to a bonk")
+
+
+## Out of a fight the greatsword rests on the shoulder; a lock brings it into the stance.
+func _test_shoulder_carry() -> void:
+	await _arena(9.0, 2)
+	_guard.global_position = Vector3(9.0, 0.02, 9.0)
+	var rig: Node3D = _player.get_node("Heading/Rig")
+	await _ticks(240)
+	var skeleton: Skeleton3D = rig.skeleton
+	var hand := skeleton.get_bone_global_pose(skeleton.find_bone("HandR")).origin
+	var tip: Vector3 = skeleton.global_transform.affine_inverse() * rig.blade_segment()[1]
+	_check(rig._carry > 0.99 and tip.y > hand.y + 0.3 and tip.z > hand.z + 0.5, "out of a fight the greatsword rests back over the shoulder")
+	_player.get_node("CameraRig").lock_target = _guard.get_node("LockPoint")
+	_guard.global_position = Vector3(0.0, 0.02, -4.0)
+	await _ticks(30)
+	tip = skeleton.global_transform.affine_inverse() * rig.blade_segment()[1]
+	_check(rig._carry < 0.01 and tip.z < -0.6, "locked on, it comes off the shoulder into the two-handed stance")
 
 
 func _count_frozen() -> int:

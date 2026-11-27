@@ -172,6 +172,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	var local_velocity := _heading.global_basis.inverse() * get_real_velocity()
 	var local_motion := Vector2(local_velocity.x, local_velocity.z).limit_length(pursuit_speed) / pursuit_speed
+	_rig.guard_up = mode == Mode.HUNT or not ai_enabled
 	_rig.track_velocity(get_real_velocity(), delta, _combat.action != &"")
 	_rig.apply_motion(_combat.clip(), _combat.pose_phase(), local_motion, delta)
 

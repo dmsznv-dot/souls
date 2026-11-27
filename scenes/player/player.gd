@@ -41,6 +41,8 @@ var _roll_landed: bool
 @onready var _camera_rig: OrbitCamera = $CameraRig
 @onready var _combat := get_node_or_null("Combat") as Combatant
 @onready var _rig: Node3D = get_node_or_null("Heading/Rig")
+## Seconds the two-handed stance is held after the last sign of a fight.
+var _combat_ready: float
 
 
 func _ready() -> void:
@@ -121,6 +123,11 @@ func _physics_process(delta: float) -> void:
 
 	_update_heading(target, direction, delta)
 	if _rig != null:
+		# Heavy two-handers rest on the shoulder until a fight calls for the stance.
+		_combat_ready = maxf(0.0, _combat_ready - delta)
+		if is_instance_valid(target) or _combat.blocking or _combat.action not in [&"", &"roll", &"jump"]:
+			_combat_ready = 2.5
+		_rig.guard_up = _combat_ready > 0.0
 		var local_velocity := _heading.global_basis.inverse() * get_real_velocity()
 		# Normalized to walking-to-running speed; a sprint reads above 1 and blends the sprint clip.
 		var local_motion := Vector2(local_velocity.x, local_velocity.z).limit_length(sprint_speed) / move_speed

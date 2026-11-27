@@ -85,6 +85,14 @@ const SWINGS := {
 }
 ## Two-handed guard: both fists stacked on the grip in front of the navel.
 const TWO_HAND_STANCE := [Vector3(0.1, 0.96, -0.32), Vector3(0.05, 0.62, -0.78), Vector3(0.8, -0.6, 0.2)]
+## Out of a fight a greatsword or a maul rests on the right shoulder: the hand low in front of
+## the chest, the blade or haft laid back over the shoulder, the off hand free.
+const SHOULDER_CARRY := [Vector3(0.2, 1.2, -0.27), Vector3(0.08, 0.6, 0.8), Vector3(0.85, -0.5, -0.1)]
+
+## Set by the body controller: true while locked on, guarding or fighting. Heavy two-handers
+## come off the shoulder into the two-handed stance.
+var guard_up := true
+var _carry := 0.0
 
 @onready var skeleton: Skeleton3D = $Skeleton3D
 @onready var player: AnimationPlayer = $AnimationPlayer
@@ -499,13 +507,19 @@ func set_weapon(next: SoulsWeapon) -> void:
 					Vector4(length*.7,.023,.01,.03),Vector4(length*.92,.018,.008,.048),Vector4(length,.001,.001,.056)],
 					4,Vector3(0,0,-guard),Vector3(-90,0,0),_weapon_root)
 		SoulsWeapon.Form.HAMMER:
-			var shaft := length - .12
-			_loft("","Haft",leather,[Vector4(-weapon.grip_length,.026,.026,0),Vector4(shaft,.024,.024,0)],8,
+			# A maul: a stout haft and a head as broad as a man's chest, banded and capped.
+			var shaft := length - .16
+			_loft("","Haft",leather,[Vector4(-weapon.grip_length,.03,.03,0),Vector4(shaft * .5,.028,.028,0),
+					Vector4(shaft,.034,.034,0)],8,Vector3.ZERO,Vector3(-90,0,0),_weapon_root)
+			_loft("","Langet",trim,[Vector4(shaft - .2,.038,.038,0),Vector4(shaft,.04,.04,0)],4,
 					Vector3.ZERO,Vector3(-90,0,0),_weapon_root)
-			_box("","Head",Vector3(.34,.2,.2),iron,Vector3(0,0,-shaft-.04),Vector3.ZERO,_weapon_root)
-			_box("","Band",Vector3(.36,.06,.22),trim,Vector3(0,0,-shaft-.04),Vector3.ZERO,_weapon_root)
-			_loft("","Spike",iron,[Vector4(0,.05,.05,0),Vector4(.16,.001,.001,0)],4,
-					Vector3(0,0,-shaft-.1),Vector3(-90,0,0),_weapon_root)
+			var head := -shaft - .14
+			_box("","Head",Vector3(.46,.25,.28),iron,Vector3(0,0,head),Vector3.ZERO,_weapon_root)
+			for side in [-1, 1]:
+				_box("","Face%d" % side,Vector3(.065,.3,.32),iron,Vector3(side * .245,0,head),Vector3.ZERO,_weapon_root)
+			_box("","Band",Vector3(.48,.07,.3),trim,Vector3(0,0,head),Vector3.ZERO,_weapon_root)
+			_loft("","Spike",iron,[Vector4(0,.06,.06,0),Vector4(.14,.001,.001,0)],4,
+					Vector3(0,0,head - .15),Vector3(-90,0,0),_weapon_root)
 		SoulsWeapon.Form.STAFF:
 			var shaft := length - .1
 			_loft("","Staff",leather,[Vector4(-weapon.grip_length,.022,.022,0),Vector4(shaft,.02,.02,0)],6,
@@ -579,6 +593,17 @@ func _drive_arms(clip: StringName, phase: float) -> void:
 	elif weapon.two_handed and clip in [&"locomotion", &"jump"]:
 		key = TWO_HAND_STANCE
 		weight = 1.0
+	var shoulders := weapon.form in [SoulsWeapon.Form.GREATSWORD, SoulsWeapon.Form.HAMMER]
+	var carrying := shoulders and path.is_empty() and clip == &"locomotion" and not guard_up
+	_carry = move_toward(_carry, 1.0 if carrying else 0.0, get_physics_process_delta_time() * (3.5 if carrying else 7.0))
+	if _carry > 0.0 and not key.is_empty() and path.is_empty():
+		# The carry follows the chest as it sways with the stride.
+		var chest := skeleton.find_bone("Chest")
+		var sway := skeleton.get_bone_global_pose(chest) * skeleton.get_bone_global_rest(chest).affine_inverse()
+		var blend := smoothstep(0.0, 1.0, _carry)
+		key = [key[0].lerp(sway * SHOULDER_CARRY[0], blend),
+				(key[1] as Vector3).normalized().slerp((sway.basis * SHOULDER_CARRY[1]).normalized(), blend),
+				key[2].lerp(SHOULDER_CARRY[2], blend)]
 	if key.is_empty():
 		return
 	if weapon.two_handed and not path.is_empty():
@@ -588,11 +613,11 @@ func _drive_arms(clip: StringName, phase: float) -> void:
 	var hand: Vector3 = key[0]
 	var direction: Vector3 = (key[1] as Vector3).normalized()
 	_solve_arm("R", hand, key[2], direction, weight)
-	if weapon.two_handed:
+	if weapon.two_handed and _carry < 1.0:
 		var hand_global := skeleton.get_bone_global_pose(skeleton.find_bone("HandR"))
 		var grip_offset := Vector3(0, -.035, -.11 + weapon.grip_length * .78)
 		var grip: Vector3 = hand_global * grip_offset
-		_solve_arm("L", grip, Vector3(-0.8, -0.6, 0.2), direction, 1.0)
+		_solve_arm("L", grip, Vector3(-0.8, -0.6, 0.2), direction, 1.0 - smoothstep(0.0, 1.0, _carry))
 
 func _sample_swing(path: Array, phase: float) -> Array:
 	var i := 0
