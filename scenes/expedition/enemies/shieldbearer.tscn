@@ -1,0 +1,22 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/duel/guard.tscn" id="1_guard"]
+[ext_resource type="Resource" path="res://scenes/expedition/enemies/shield_strike.tres" id="2_light"]
+
+[node name="Shieldbearer" instance=ExtResource("1_guard")]
+collision_mask = 7
+role = &"shield"
+pursuit_speed = 2.05
+notice_distance = 5.3
+
+[node name="Rig" parent="Heading" index="0"]
+scale = Vector3(0.9, 0.9, 0.9)
+equipment = 3
+
+[node name="LockPoint" parent="." index="2"]
+position = Vector3(0, 1.18, 0)
+
+[node name="Combat" parent="." index="4"]
+light_attack = ExtResource("2_light")
+heavy_attack = ExtResource("2_light")
+max_health = 43.0

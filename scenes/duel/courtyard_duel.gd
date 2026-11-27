@@ -1,6 +1,9 @@
 extends Node3D
 
 const Combatant = preload("res://scenes/duel/combat/combatant.gd")
+const GATE_DISTANCE := 2.45
+
+@export_file("*.tscn") var post_victory_path: String
 
 var outcome: StringName
 var _debug_enabled: bool
@@ -20,6 +23,7 @@ var _reset_requested: bool
 @onready var _result_title: Label = %ResultTitle
 @onready var _hero_arc: MeshInstance3D = $HeroArc
 @onready var _guard_arc: MeshInstance3D = $GuardArc
+@onready var _gate_prompt := get_node_or_null("GatePrompt") as Label3D
 
 
 func _ready() -> void:
@@ -27,6 +31,11 @@ func _ready() -> void:
 	_guard.feedback.connect(_on_feedback)
 	_hero.defeated.connect(_finish.bind(&"defeat"))
 	_guard.defeated.connect(_finish.bind(&"victory"))
+	_guard_hp.max_value = _guard.max_health
+	if not post_victory_path.is_empty():
+		$Guard.phase_changed.connect(_on_boss_phase)
+		$Interface/GuardMeters/Caption.text = "THE ASH GATEKEEPER"
+		$Interface/Bindings/Keys/Other.text = "F / X  Jump   ·   E / A  Gate   ·   T / Menu  Retry   ·   F2  Debug"
 
 
 func _process(delta: float) -> void:
@@ -45,7 +54,11 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"restart_duel") and not _reset_requested:
+	if event.is_action_pressed(&"interact") and outcome == &"victory" and _gate_prompt != null:
+		if not _reset_requested and _gate_prompt.global_position.distance_to(_hero.body.global_position + Vector3.UP * 1.45) < GATE_DISTANCE:
+			_reset_requested = true
+			get_tree().change_scene_to_file.bind(post_victory_path).call_deferred()
+	elif event.is_action_pressed(&"restart_duel") and not _reset_requested:
 		_reset_requested = true
 		get_tree().reload_current_scene.call_deferred()
 	elif event.is_action_pressed(&"combat_debug"):
@@ -59,7 +72,7 @@ func _finish(result: StringName) -> void:
 	if outcome != &"":
 		return
 	outcome = result
-	$Player.can_fight = false
+	$Player.can_fight = result == &"victory" and _gate_prompt != null
 	$Guard.ai_enabled = false
 	if result == &"victory":
 		$Guard/LockPoint.hide()
@@ -67,8 +80,17 @@ func _finish(result: StringName) -> void:
 		$Guard.set_deferred("collision_mask", 1)
 	var fallen := _guard if result == &"victory" else _hero
 	_audio.play_cue(result, fallen.body.global_position)
+	if result == &"victory" and _gate_prompt != null:
+		_gate_prompt.show()
+		_show_notice("Gate unsealed · Approach the gate and press E / A", 4.0)
+		return
 	_result_title.text = "WATCHER DEFEATED" if result == &"victory" else "YOU FELL"
 	get_tree().create_timer(0.52).timeout.connect(_result.show)
+
+
+func _on_boss_phase(phase: int) -> void:
+	$Interface/GuardMeters/Caption.text = "THE ASH GATEKEEPER  ·  %s" % ("II" if phase == 2 else "I")
+	_show_notice("The Gatekeeper readies his blade", 1.8)
 
 
 func _on_feedback(cue: StringName, location: Vector3) -> void:
@@ -88,9 +110,9 @@ func _on_feedback(cue: StringName, location: Vector3) -> void:
 			_sparks(location, Color(1.0, 0.64, 0.42), 7)
 
 
-func _show_notice(message: String) -> void:
+func _show_notice(message: String, duration: float = 0.85) -> void:
 	_notice.text = message
-	_notice_time = 0.85
+	_notice_time = duration
 
 
 func _sparks(location: Vector3, color: Color, count: int) -> void:

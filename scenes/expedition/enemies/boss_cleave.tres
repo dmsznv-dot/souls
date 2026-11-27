@@ -1,0 +1,18 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scenes/duel/combat/attack_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+clip = &"heavy"
+windup = 0.54
+active = 0.16
+recovery = 0.9
+damage = 36.0
+stamina_cost = 0.0
+block_cost = 42.0
+posture_damage = 42.0
+reach = 3.3
+arc = 103.0
+lunge_speed = 2.4
+projectile_speed = 0.0

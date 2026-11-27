@@ -2,8 +2,9 @@ extends CharacterBody3D
 
 const OrbitCamera = preload("res://scenes/player/orbit_camera.gd")
 const Combatant = preload("res://scenes/duel/combat/combatant.gd")
-const COMBAT_PRESSES: Array[StringName] = [&"roll", &"parry", &"heavy_attack", &"light_attack"]
+const COMBAT_PRESSES: Array[StringName] = [&"roll", &"parry", &"heavy_attack", &"light_attack", &"jump"]
 const BUFFER_SECONDS: float = 0.12
+const JUMP_SPEED: float = 3.55
 
 @export_range(0.1, 12.0, 0.1, "suffix:m/s") var move_speed: float = 4.5
 @export_range(1.0, 30.0, 0.5, "suffix:rad/s") var turn_speed: float = 14.0
@@ -46,8 +47,11 @@ func _physics_process(delta: float) -> void:
 			_face_target(target)
 
 	var horizontal := Vector3(velocity.x, 0.0, velocity.z)
-	if move_acceleration > 0.0 and (_combat == null or _combat.action != &"roll"):
-		horizontal = horizontal.move_toward(motion, move_acceleration * delta)
+	if _combat != null and _combat.contact_frozen:
+		horizontal = Vector3.ZERO
+	elif move_acceleration > 0.0 and (_combat == null or _combat.action != &"roll"):
+		var correction := 1.5 if motion.dot(horizontal) < horizontal.length_squared() else 1.0
+		horizontal = horizontal.move_toward(motion, move_acceleration * correction * delta)
 	else:
 		horizontal = motion
 	velocity.x = horizontal.x
@@ -77,11 +81,15 @@ func _combat_motion(motion: Vector3, direction: Vector3, delta: float) -> Vector
 	if not can_fight:
 		_buffered_action = &""
 	elif _buffered_action != &"":
-		if _combat.action == &"":
+		if _combat.action == &"" and not _combat.contact_frozen:
 			match _buffered_action:
 				&"light_attack": _combat.start_attack(_combat.light_attack)
 				&"heavy_attack": _combat.start_attack(_combat.heavy_attack)
 				&"parry": _combat.start_parry()
+				&"jump":
+					var airtime := 2.0 * JUMP_SPEED / get_gravity().length()
+					if _combat.start_jump(airtime + 0.09):
+						velocity.y = JUMP_SPEED
 				&"roll":
 					var backwards := direction.length_squared() <= 0.01
 					var dodge := _heading.global_basis.z if backwards else direction
@@ -94,11 +102,12 @@ func _combat_motion(motion: Vector3, direction: Vector3, delta: float) -> Vector
 				_buffered_action = &""
 
 	if _combat.action == &"roll":
-		var speed := 7.6 if _combat.action_age < 0.29 else 7.6 * (1.0 - _combat.pose_phase()) / 0.47
+		var age := _combat.action_age
+		var speed := 7.8 * smoothstep(0.0, 0.068, age) * (1.0 - smoothstep(0.28, 0.55, age))
 		return _combat.dodge_direction * speed
-	if not can_fight or _combat.action != &"":
-		return -_heading.global_basis.z * _combat.lunge_speed()
-	return motion * (0.38 if _combat.blocking else 1.0)
+	if not can_fight:
+		return Vector3.ZERO
+	return motion * _combat.movement_weight() - _heading.global_basis.z * _combat.lunge_speed()
 
 
 func _update_heading(target: Marker3D, direction: Vector3, delta: float) -> void:
@@ -108,15 +117,16 @@ func _update_heading(target: Marker3D, direction: Vector3, delta: float) -> void
 			_heading.rotation.y = atan2(-dodge.x, -dodge.z)
 		return
 	if is_instance_valid(target):
-		_face_target(target)
+		_face_target(target, turn_speed * delta if _combat != null else TAU)
 	elif direction.length_squared() > 0.0:
 		var desired_yaw := atan2(-direction.x, -direction.z)
 		_heading.rotation.y = rotate_toward(_heading.rotation.y, desired_yaw, turn_speed * delta)
 
 
-func _face_target(target: Marker3D) -> void:
+func _face_target(target: Marker3D, turn_limit: float = TAU) -> void:
 	var towards_target := _flat_direction(target.global_position - global_position)
-	_heading.rotation.y = atan2(-towards_target.x, -towards_target.z)
+	var target_yaw := atan2(-towards_target.x, -towards_target.z)
+	_heading.rotation.y = rotate_toward(_heading.rotation.y, target_yaw, turn_limit)
 
 
 func _buffer(action: StringName) -> void:

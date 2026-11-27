@@ -1,6 +1,7 @@
 extends Node
 
 const AttackData = preload("res://scenes/duel/combat/attack_data.gd")
+const ThrownBolt = preload("res://scenes/expedition/enemies/thrown_bolt.gd")
 
 signal feedback(cue: StringName, location: Vector3)
 signal defeated
@@ -15,6 +16,7 @@ const PARRY_STAGGER: float = 0.98
 @export var light_attack: AttackData
 @export var heavy_attack: AttackData
 @export_flags_3d_physics var opponent_mask: int = 4
+@export_range(1.0, 300.0, 1.0) var max_health: float = 100.0
 
 var health: float = 100.0
 var stamina: float = 100.0
@@ -25,10 +27,12 @@ var action_duration: float
 var attack: AttackData
 var blocking: bool
 var dodge_direction: Vector3
+var contact_frozen: bool
 
 var _stamina_wait: float
 var _posture_wait: float
 var _parried: bool
+var _contact_time: float
 var _hit_bodies: Array[int] = []
 var _swing_volume: SphereShape3D = SphereShape3D.new()
 
@@ -36,7 +40,15 @@ var _swing_volume: SphereShape3D = SphereShape3D.new()
 @onready var heading: Node3D = body.get_node("Heading")
 
 
+func _ready() -> void:
+	health = max_health
+
+
 func advance(delta: float) -> void:
+	contact_frozen = _contact_time > 0.0
+	if contact_frozen:
+		_contact_time = maxf(0.0, _contact_time - delta)
+		return
 	if action == &"dead":
 		action_age = minf(action_age + delta, action_duration)
 		return
@@ -55,7 +67,10 @@ func advance(delta: float) -> void:
 	if attack != null and action_age >= attack.windup and previous_age < attack.windup + attack.active:
 		if previous_age < attack.windup:
 			_emit(&"heavy" if attack.damage >= 30.0 else &"swing")
-		_hit_within_reach()
+			if attack.projectile_speed > 0.0:
+				_launch_bolt()
+		if attack.projectile_speed <= 0.0:
+			_hit_within_reach()
 	if action_age >= action_duration:
 		_set_action(&"", 0.0)
 
@@ -86,19 +101,35 @@ func start_parry() -> bool:
 	return true
 
 
-func receive_attack(attacker: Node, incoming: AttackData) -> void:
+func start_jump(duration: float) -> bool:
+	if action != &"" or not body.is_on_floor() or not _spend(10.0):
+		return false
+	_set_action(&"jump", duration)
+	return true
+
+
+func start_boss_phase() -> void:
+	_set_action(&"boss_phase", 0.9)
+	_emit(&"windup")
+
+
+func receive_attack(attacker: Node, incoming: AttackData, shot_source_direction: Vector3 = Vector3.ZERO) -> bool:
 	if action == &"dead" or (action == &"roll" and action_age >= 0.07 and action_age <= 0.25):
-		return
-	var towards_attacker: Vector3 = attacker.body.global_position - body.global_position
+		return false
+	var projectile := shot_source_direction != Vector3.ZERO
+	var towards_attacker: Vector3 = shot_source_direction if projectile else attacker.body.global_position - body.global_position
 	towards_attacker.y = 0.0
 	var frontal := -heading.global_basis.z.dot(towards_attacker.normalized()) >= BLOCK_FACING
+	_contact_time = 0.045 if incoming.damage < 30.0 else 0.065
 
 	if frontal and action == &"parry" and action_age >= 0.035 and action_age <= 0.20:
-		attacker.interrupt_for_parry()
+		if not projectile:
+			attacker.interrupt_for_parry()
 		_set_action(&"parry", 0.13)
 		action_age = 0.05
+		_contact_time = 0.075
 		_emit(&"parry")
-		return
+		return true
 	if frontal and blocking and action == &"":
 		var could_hold := stamina > incoming.block_cost
 		_spend(minf(stamina, incoming.block_cost))
@@ -110,13 +141,13 @@ func receive_attack(attacker: Node, incoming: AttackData) -> void:
 			if action != &"dead":
 				_set_action(&"stagger", 0.75)
 				_emit(&"guard_break")
-		return
+		return true
 
 	var damage := incoming.damage * (1.5 if _parried else 1.0)
 	_parried = false
 	_damage(damage)
 	if action == &"dead":
-		return
+		return true
 	_emit(&"hit")
 	posture = maxf(0.0, posture - incoming.posture_damage)
 	_posture_wait = 0.90
@@ -125,6 +156,7 @@ func receive_attack(attacker: Node, incoming: AttackData) -> void:
 		_set_action(&"stagger", 0.82)
 	elif opponent_mask == 4 and action != &"stagger":
 		_set_action(&"stagger", 0.32)
+	return true
 
 
 func interrupt_for_parry() -> void:
@@ -160,8 +192,22 @@ func phase_name() -> String:
 
 
 func lunge_speed() -> float:
-	if attack != null and action_age >= attack.windup and action_age < attack.windup + attack.active:
-		return attack.lunge_speed
+	if not contact_frozen and attack != null and action_age >= attack.windup and action_age < attack.windup + attack.active:
+		var progress := (action_age - attack.windup) / attack.active
+		return attack.lunge_speed * sin(PI * progress) * 1.45
+	return 0.0
+
+
+func movement_weight() -> float:
+	if contact_frozen:
+		return 0.0
+	if action == &"jump":
+		return 0.72
+	if attack != null:
+		var recovery_start := attack.windup + attack.active
+		return smoothstep(recovery_start + attack.recovery * 0.55, action_duration, action_age)
+	if action == &"":
+		return 0.38 if blocking else 1.0
 	return 0.0
 
 
@@ -197,6 +243,13 @@ func _emit(cue: StringName) -> void:
 	feedback.emit(cue, body.global_position + Vector3.UP * 1.20)
 
 
+func _launch_bolt() -> void:
+	var bolt := ThrownBolt.new()
+	get_tree().current_scene.add_child(bolt)
+	var forward := -heading.global_basis.z
+	bolt.launch(self, attack, body.global_position + Vector3.UP * 1.23 + forward * 0.54, forward, opponent_mask)
+
+
 func _hit_within_reach() -> void:
 	var definition := attack
 	var origin := body.global_position + Vector3.UP
@@ -224,7 +277,9 @@ func _hit_within_reach() -> void:
 		var defender := other.get_node_or_null("Combat")
 		if defender == null:
 			continue
-		_hit_bodies.append(other.get_instance_id())
-		defender.receive_attack(self, definition)
+		if not defender.receive_attack(self, definition):
+			continue
+		_contact_time = 0.045 if definition.damage < 30.0 else 0.065
 		if attack != definition:
 			return
+		_hit_bodies.append(other.get_instance_id())

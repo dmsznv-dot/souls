@@ -1,0 +1,350 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/environment/outer_ruins.glb" id="Road"]
+[ext_resource type="PackedScene" path="res://assets/environment/modular-dungeon-kit/gate.glb" id="Gate"]
+[ext_resource type="PackedScene" path="res://assets/environment/modular-dungeon-kit/template-floor.glb" id="Slab"]
+[ext_resource type="PackedScene" path="res://assets/environment/modular-dungeon-kit/template-wall-half.glb" id="Wall"]
+[ext_resource type="PackedScene" path="res://assets/environment/graveyard-kit/iron-fence.glb" id="Fence"]
+[ext_resource type="PackedScene" path="res://assets/environment/graveyard-kit/gravestone-decorative.glb" id="Stela"]
+[ext_resource type="PackedScene" path="res://assets/environment/graveyard-kit/urn-round.glb" id="Vessel"]
+[ext_resource type="PackedScene" path="res://assets/environment/prototype-kit/column-rounded-low.glb" id="Plinth"]
+[ext_resource type="NavigationMesh" path="res://scenes/expedition/environment/outer_navigation.tres" id="Nav"]
+
+[sub_resource type="ProceduralSkyMaterial" id="Dusk"]
+sky_top_color = Color(0.27, 0.27, 0.40, 1)
+sky_horizon_color = Color(0.73, 0.65, 0.72, 1)
+sky_curve = 0.25
+ground_horizon_color = Color(0.68, 0.61, 0.67, 1)
+ground_bottom_color = Color(0.28, 0.29, 0.33, 1)
+sun_angle_max = 4.0
+sun_curve = 0.06
+
+[sub_resource type="Sky" id="Sky"]
+sky_material = SubResource("Dusk")
+
+[sub_resource type="Environment" id="Haze"]
+background_mode = 2
+sky = SubResource("Sky")
+ambient_light_source = 2
+ambient_light_color = Color(0.80, 0.82, 0.89, 1)
+ambient_light_sky_contribution = 0.18
+ambient_light_energy = 0.68
+fog_enabled = true
+fog_density = 0.014
+fog_light_color = Color(0.62, 0.56, 0.66, 1)
+fog_sky_affect = 0.17
+fog_aerial_perspective = 0.12
+
+[sub_resource type="BoxShape3D" id="Ground"]
+size = Vector3(16, 0.46, 41.2)
+
+[sub_resource type="BoxShape3D" id="Boundary"]
+size = Vector3(0.82, 4.1, 41)
+
+[sub_resource type="BoxShape3D" id="EndWall"]
+size = Vector3(16, 3, 1.2)
+
+[sub_resource type="BoxShape3D" id="GateWall"]
+size = Vector3(4.3, 1.25, 1.2)
+
+[sub_resource type="BoxShape3D" id="Pier"]
+size = Vector3(1.52, 4.2, 1.52)
+
+[sub_resource type="BoxShape3D" id="EntrancePier"]
+size = Vector3(1.45, 4.6, 1.55)
+
+[node name="OuterRuinsEnvironment" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Haze")
+
+[node name="EveningLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-37, 25, 0)
+light_color = Color(1, 0.88, 0.76, 1)
+light_energy = 0.99
+shadow_enabled = true
+shadow_opacity = 0.67
+directional_shadow_max_distance = 53.0
+
+[node name="AqueductWalk" type="NavigationRegion3D" parent="."]
+navigation_mesh = ExtResource("Nav")
+
+[node name="Stonework" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="Roadbed" type="CollisionShape3D" parent="Stonework"]
+position = Vector3(0, -0.23, -11.6)
+shape = SubResource("Ground")
+
+[node name="Shrine" type="CollisionShape3D" parent="Stonework"]
+position = Vector3(0, 1.5, -29.72)
+shape = SubResource("EndWall")
+
+[node name="RearGate" type="CollisionShape3D" parent="Stonework"]
+position = Vector3(0, 1.5, 8.48)
+shape = SubResource("EndWall")
+
+[node name="WestArcade" type="CollisionShape3D" parent="Stonework"]
+position = Vector3(-7.86, 2.05, -11.6)
+shape = SubResource("Boundary")
+
+[node name="WestCrossing0" type="CollisionShape3D" parent="Stonework"]
+position = Vector3(-5.58, 0.625, -8.9)
+shape = SubResource("GateWall")
+
+[node name="WestPier0" type="CollisionShape3D" parent="Stonework"]
+position = Vector3(-4.15, 2.1, -8.9)
+shape = SubResource("Pier")
+
+[node name="WestCrossing1" type="CollisionShape3D" parent="Stonework"]
+position = Vector3(-5.58, 0.625, -18.5)
+shape = SubResource("GateWall")
+
+[node name="WestPier1" type="CollisionShape3D" parent="Stonework"]
+position = Vector3(-4.15, 2.1, -18.5)
+shape = SubResource("Pier")
+
+[node name="EastArcade" type="CollisionShape3D" parent="Stonework"]
+position = Vector3(7.86, 2.05, -11.6)
+shape = SubResource("Boundary")
+
+[node name="EastCrossing0" type="CollisionShape3D" parent="Stonework"]
+position = Vector3(5.58, 0.625, -8.9)
+shape = SubResource("GateWall")
+
+[node name="EastPier0" type="CollisionShape3D" parent="Stonework"]
+position = Vector3(4.15, 2.1, -8.9)
+shape = SubResource("Pier")
+
+[node name="EastCrossing1" type="CollisionShape3D" parent="Stonework"]
+position = Vector3(5.58, 0.625, -18.5)
+shape = SubResource("GateWall")
+
+[node name="EastPier1" type="CollisionShape3D" parent="Stonework"]
+position = Vector3(4.15, 2.1, -18.5)
+shape = SubResource("Pier")
+
+[node name="OriginalRuins" parent="." instance=ExtResource("Road")]
+position = Vector3(0, 0, 0)
+scale = Vector3(1, 1, 1)
+rotation_degrees = Vector3(0, 0, 0)
+
+[node name="WestRail0" parent="." instance=ExtResource("Fence")]
+position = Vector3(-7.8, 1.11, 2.55)
+scale = Vector3(1.85, 1.28, 1.22)
+rotation_degrees = Vector3(0, -90, 0)
+
+[node name="WestRail1" parent="." instance=ExtResource("Fence")]
+position = Vector3(-7.8, 1.11, -2.1)
+scale = Vector3(1.85, 1.28, 1.22)
+rotation_degrees = Vector3(0, -90, 0)
+
+[node name="WestRail2" parent="." instance=ExtResource("Fence")]
+position = Vector3(-7.8, 1.11, -12.2)
+scale = Vector3(1.85, 1.28, 1.22)
+rotation_degrees = Vector3(0, -90, 0)
+
+[node name="WestRail3" parent="." instance=ExtResource("Fence")]
+position = Vector3(-7.8, 1.11, -14.3)
+scale = Vector3(1.85, 1.28, 1.22)
+rotation_degrees = Vector3(0, -90, 0)
+
+[node name="WestRail4" parent="." instance=ExtResource("Fence")]
+position = Vector3(-7.8, 1.11, -22.6)
+scale = Vector3(1.85, 1.28, 1.22)
+rotation_degrees = Vector3(0, -90, 0)
+
+[node name="WestRail5" parent="." instance=ExtResource("Fence")]
+position = Vector3(-7.8, 1.11, -24.7)
+scale = Vector3(1.85, 1.28, 1.22)
+rotation_degrees = Vector3(0, -90, 0)
+
+[node name="WestMemorial0" parent="." instance=ExtResource("Stela")]
+position = Vector3(-8.73, 0, 1.1)
+scale = Vector3(1.45, 1.65, 1.45)
+rotation_degrees = Vector3(0, 65, 0)
+
+[node name="WestMemorial1" parent="." instance=ExtResource("Stela")]
+position = Vector3(-9.21, 0, -0.18)
+scale = Vector3(1.45, 1.98, 1.45)
+rotation_degrees = Vector3(0, 51, 0)
+
+[node name="WestMemorial2" parent="." instance=ExtResource("Stela")]
+position = Vector3(-8.73, 0, -11.55)
+scale = Vector3(1.45, 1.98, 1.45)
+rotation_degrees = Vector3(0, 37, 0)
+
+[node name="WestMemorial3" parent="." instance=ExtResource("Stela")]
+position = Vector3(-9.21, 0, -14.2)
+scale = Vector3(1.45, 1.65, 1.45)
+rotation_degrees = Vector3(0, 65, 0)
+
+[node name="WestMemorial4" parent="." instance=ExtResource("Stela")]
+position = Vector3(-8.73, 0, -24.5)
+scale = Vector3(1.45, 1.98, 1.45)
+rotation_degrees = Vector3(0, 51, 0)
+
+[node name="WestMemorial5" parent="." instance=ExtResource("Stela")]
+position = Vector3(-9.21, 0, -25.7)
+scale = Vector3(1.45, 1.98, 1.45)
+rotation_degrees = Vector3(0, 37, 0)
+
+[node name="WestBurialWall0" parent="." instance=ExtResource("Wall")]
+position = Vector3(-9.0, 0, -5)
+scale = Vector3(0.93, 0.82, 0.85)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="WestBurialWall1" parent="." instance=ExtResource("Wall")]
+position = Vector3(-9.0, 0, -15.5)
+scale = Vector3(0.93, 0.82, 0.85)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="WestBurialWall2" parent="." instance=ExtResource("Wall")]
+position = Vector3(-9.0, 0, -26.9)
+scale = Vector3(0.93, 0.82, 0.85)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="WestTerrace0" parent="." instance=ExtResource("Slab")]
+position = Vector3(-10.35, 0.06, -6.5)
+scale = Vector3(1.1, 1, 1)
+rotation_degrees = Vector3(0, 0, 0)
+
+[node name="WestTerrace1" parent="." instance=ExtResource("Slab")]
+position = Vector3(-10.35, 0.06, -22.2)
+scale = Vector3(1.1, 1, 1)
+rotation_degrees = Vector3(0, 0, 0)
+
+[node name="WestUrnPlinth" parent="." instance=ExtResource("Plinth")]
+position = Vector3(-7.83, 1.22, -27.16)
+scale = Vector3(2.7, 1.3, 2.7)
+rotation_degrees = Vector3(0, 0, 0)
+
+[node name="WestOfferingVessel" parent="." instance=ExtResource("Vessel")]
+position = Vector3(-7.83, 1.87, -27.16)
+scale = Vector3(2.35, 2.35, 2.35)
+rotation_degrees = Vector3(0, 0, 0)
+
+[node name="EastRail0" parent="." instance=ExtResource("Fence")]
+position = Vector3(7.8, 1.11, 2.55)
+scale = Vector3(1.85, 1.28, 1.22)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="EastRail1" parent="." instance=ExtResource("Fence")]
+position = Vector3(7.8, 1.11, -2.1)
+scale = Vector3(1.85, 1.28, 1.22)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="EastRail2" parent="." instance=ExtResource("Fence")]
+position = Vector3(7.8, 1.11, -12.2)
+scale = Vector3(1.85, 1.28, 1.22)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="EastRail3" parent="." instance=ExtResource("Fence")]
+position = Vector3(7.8, 1.11, -14.3)
+scale = Vector3(1.85, 1.28, 1.22)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="EastRail4" parent="." instance=ExtResource("Fence")]
+position = Vector3(7.8, 1.11, -22.6)
+scale = Vector3(1.85, 1.28, 1.22)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="EastRail5" parent="." instance=ExtResource("Fence")]
+position = Vector3(7.8, 1.11, -24.7)
+scale = Vector3(1.85, 1.28, 1.22)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="EastMemorial0" parent="." instance=ExtResource("Stela")]
+position = Vector3(8.73, 0, 1.1)
+scale = Vector3(1.45, 1.65, 1.45)
+rotation_degrees = Vector3(0, -65, 0)
+
+[node name="EastMemorial1" parent="." instance=ExtResource("Stela")]
+position = Vector3(9.21, 0, -0.18)
+scale = Vector3(1.45, 1.98, 1.45)
+rotation_degrees = Vector3(0, -51, 0)
+
+[node name="EastMemorial2" parent="." instance=ExtResource("Stela")]
+position = Vector3(8.73, 0, -11.55)
+scale = Vector3(1.45, 1.98, 1.45)
+rotation_degrees = Vector3(0, -37, 0)
+
+[node name="EastMemorial3" parent="." instance=ExtResource("Stela")]
+position = Vector3(9.21, 0, -14.2)
+scale = Vector3(1.45, 1.65, 1.45)
+rotation_degrees = Vector3(0, -65, 0)
+
+[node name="EastMemorial4" parent="." instance=ExtResource("Stela")]
+position = Vector3(8.73, 0, -24.5)
+scale = Vector3(1.45, 1.98, 1.45)
+rotation_degrees = Vector3(0, -51, 0)
+
+[node name="EastMemorial5" parent="." instance=ExtResource("Stela")]
+position = Vector3(9.21, 0, -25.7)
+scale = Vector3(1.45, 1.98, 1.45)
+rotation_degrees = Vector3(0, -37, 0)
+
+[node name="EastBurialWall0" parent="." instance=ExtResource("Wall")]
+position = Vector3(9.0, 0, -5)
+scale = Vector3(0.93, 0.82, 0.85)
+rotation_degrees = Vector3(0, -90, 0)
+
+[node name="EastBurialWall1" parent="." instance=ExtResource("Wall")]
+position = Vector3(9.0, 0, -15.5)
+scale = Vector3(0.93, 0.82, 0.85)
+rotation_degrees = Vector3(0, -90, 0)
+
+[node name="EastBurialWall2" parent="." instance=ExtResource("Wall")]
+position = Vector3(9.0, 0, -26.9)
+scale = Vector3(0.93, 0.82, 0.85)
+rotation_degrees = Vector3(0, -90, 0)
+
+[node name="EastTerrace0" parent="." instance=ExtResource("Slab")]
+position = Vector3(10.35, 0.06, -6.5)
+scale = Vector3(1.1, 1, 1)
+rotation_degrees = Vector3(0, 0, 0)
+
+[node name="EastTerrace1" parent="." instance=ExtResource("Slab")]
+position = Vector3(10.35, 0.06, -22.2)
+scale = Vector3(1.1, 1, 1)
+rotation_degrees = Vector3(0, 0, 0)
+
+[node name="EastUrnPlinth" parent="." instance=ExtResource("Plinth")]
+position = Vector3(7.83, 1.22, -27.16)
+scale = Vector3(2.7, 1.3, 2.7)
+rotation_degrees = Vector3(0, 0, 0)
+
+[node name="EastOfferingVessel" parent="." instance=ExtResource("Vessel")]
+position = Vector3(7.83, 1.87, -27.16)
+scale = Vector3(2.35, 2.35, 2.35)
+rotation_degrees = Vector3(0, 0, 0)
+
+[node name="EntranceArch" parent="." instance=ExtResource("Gate")]
+position = Vector3(0, 0, 8.76)
+scale = Vector3(1.35, 1.08, 1.1)
+rotation_degrees = Vector3(0, 0, 0)
+
+[node name="WatchFire1" type="OmniLight3D" parent="."]
+position = Vector3(-4.15, 3.95, -18.5)
+light_color = Color(1, 0.66, 0.39, 1)
+light_energy = 1.45
+omni_range = 5.0
+
+[node name="WatchFire2" type="OmniLight3D" parent="."]
+position = Vector3(4.15, 3.95, -18.5)
+light_color = Color(1, 0.66, 0.39, 1)
+light_energy = 1.45
+omni_range = 5.0
+
+[node name="WatchFire3" type="OmniLight3D" parent="."]
+position = Vector3(-5, 2.1, -30.55)
+light_color = Color(1, 0.66, 0.39, 1)
+light_energy = 1.45
+omni_range = 5.0
+
+[node name="WatchFire4" type="OmniLight3D" parent="."]
+position = Vector3(5, 2.1, -30.55)
+light_color = Color(1, 0.66, 0.39, 1)
+light_energy = 1.45
+omni_range = 5.0
