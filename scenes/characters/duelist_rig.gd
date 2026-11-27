@@ -748,6 +748,9 @@ func apply_motion(clip: StringName, phase: float, local_motion: Vector2, delta: 
 		if player.has_animation(clip):
 			player.play(clip)
 		last_clip = clip
+		var perf := get_node_or_null(^"/root/Perf")
+		if perf != null:
+			perf.mark(StringName("clip:" + clip))
 	breath_clock = fposmod(breath_clock + delta / 3.4, 1.0)
 	match clip:
 		&"locomotion":

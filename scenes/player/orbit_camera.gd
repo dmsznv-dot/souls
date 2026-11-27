@@ -43,6 +43,13 @@ func _ready() -> void:
 	global_position = _follow
 
 
+## After a teleport: jump straight to the body instead of gliding there.
+func snap() -> void:
+	_follow = get_parent().global_position + _anchor_offset
+	global_position = _follow
+	reset_physics_interpolation()
+
+
 func add_trauma(amount: float) -> void:
 	trauma = clampf(trauma + amount, 0.0, 1.0)
 
@@ -68,6 +75,8 @@ func update_orbit(delta: float) -> void:
 	var goal: Vector3 = get_parent().global_position + _anchor_offset
 	if _follow.distance_squared_to(goal) > 16.0:
 		_follow = goal
+		global_position = goal
+		reset_physics_interpolation()
 	var plane := 1.0 - exp(-follow_rate * delta)
 	_follow.x = lerpf(_follow.x, goal.x, plane)
 	_follow.z = lerpf(_follow.z, goal.z, plane)
@@ -87,36 +96,36 @@ func update_orbit(delta: float) -> void:
 		_pitch.rotation.x = clampf(_pitch.rotation.x - motion.y, -1.05, 0.65)
 	_mouse_motion = Vector2.ZERO
 	_lock_marker.visible = is_instance_valid(lock_target)
-
-
-func _process(delta: float) -> void:
 	# The arm endpoint has a valid position before the first physics query.
 	var safe_distance := _arm_end.position.z
 	_camera_distance = minf(safe_distance,
 		move_toward(_camera_distance, _arm.spring_length, camera_return_speed * delta))
 	# The arm moves its direct child immediately. The camera can only offset inward.
 	_camera.position.z = _camera_distance - safe_distance
+
+
+func _process(delta: float) -> void:
+	# Projection offsets and FOV only: transforms move in the physics tick so that physics
+	# interpolation can smooth them on high-refresh displays.
 	_update_shake(delta)
 	var body := get_parent()
 	var sprint_fov: float = _base_fov + (5.0 if body.get(&"sprinting") else 0.0)
 	_camera.fov = lerpf(_camera.fov, sprint_fov, 1.0 - exp(-4.0 * delta))
 
 
-## Trauma-squared shake on the camera only, decaying in real time so hit-stop cannot freeze it
+## Trauma-squared shake through the camera's projection offsets, decaying in real time so hit-stop cannot freeze it
 ## off-centre. Summed sines instead of per-frame noise keep it from buzzing.
 func _update_shake(delta: float) -> void:
 	var real_delta := delta / maxf(Engine.time_scale, 0.0001)
 	if trauma <= 0.0:
 		_camera.h_offset = 0.0
 		_camera.v_offset = 0.0
-		_camera.rotation.z = 0.0
 		return
 	trauma = maxf(trauma - 1.6 * real_delta, 0.0)
 	_shake_clock += real_delta * 32.0
 	var shake := trauma * trauma * shake_strength
 	_camera.h_offset = 0.16 * shake * sin(_shake_clock * 1.7)
 	_camera.v_offset = 0.11 * shake * sin(_shake_clock * 2.3 + 1.1)
-	_camera.rotation.z = 0.035 * shake * sin(_shake_clock * 1.1 + 0.4)
 
 
 func _update_lock(delta: float) -> void:

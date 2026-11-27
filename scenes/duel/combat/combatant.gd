@@ -406,6 +406,9 @@ func _damage(amount: float) -> void:
 
 
 func _emit(cue: StringName, strength: float = 0.5) -> void:
+	var perf := get_node_or_null(^"/root/Perf")
+	if perf != null:
+		perf.mark(cue)
 	feedback.emit(cue, body.global_position + Vector3.UP * 1.20, strength)
 
 

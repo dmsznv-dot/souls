@@ -73,6 +73,8 @@ func respawn_in_ruins() -> void:
 	_spawn_ruins()
 	var player := $Player as CharacterBody3D
 	player.global_transform = ruins.entrance_transform()
+	player.reset_physics_interpolation()
+	player.get_node("CameraRig").snap()
 	player.velocity = Vector3.ZERO
 	player.get_node("Heading").rotation.y = 0.0
 	player.get_node("CameraRig").lock_target = null
@@ -99,6 +101,7 @@ func _spawn_ruins() -> void:
 	ruins.name = "OuterRuinsArea"
 	add_child(ruins)
 	ruins.position = RUINS_OFFSET
+	ruins.reset_physics_interpolation()
 	ruins.setup($Player, true)
 	ruins.set_backdrop_visible(zone == &"ruins")
 	for enemy in ruins.enemies():

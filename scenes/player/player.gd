@@ -189,6 +189,7 @@ func _combat_motion(motion: Vector3, direction: Vector3, delta: float) -> Vector
 					var airtime := rise + sqrt(2.0 * height / (g * FALL_GRAVITY))
 					if _combat.start_jump(airtime + 0.09):
 						velocity.y = JUMP_SPEED
+						Perf.mark(&"jump")
 				&"roll":
 					var backwards := direction.length_squared() <= 0.01
 					var dodge := _heading.global_basis.z if backwards else direction

@@ -35,6 +35,7 @@ func _ready() -> void:
 	_guard.defeated.connect(_finish.bind(&"victory"))
 	_guard_hp.max_value = _guard.max_health
 	Music.play_area(&"court", 1.5)
+	RetroFX.prewarm.call_deferred(get_viewport().get_camera_3d())
 	Music.attach_torches(self)
 	_focus = HudUtil.add_focus_bar(_stamina)
 	_hero.weapon_changed.connect(func(weapon: SoulsWeapon) -> void: _show_notice(HudUtil.weapon_notice(weapon), 2.2))
@@ -141,28 +142,7 @@ func _show_notice(message: String, duration: float = 0.85) -> void:
 
 
 func _sparks(location: Vector3, color: Color, count: int) -> void:
-	var particle := CPUParticles3D.new()
-	var dot := BoxMesh.new()
-	dot.size = Vector3(0.045, 0.072, 0.045)
-	var glow := StandardMaterial3D.new()
-	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	glow.albedo_color = color
-	dot.material = glow
-	particle.mesh = dot
-	particle.amount = count
-	particle.lifetime = 0.31
-	particle.one_shot = true
-	particle.explosiveness = 0.98
-	particle.spread = 130.0
-	particle.direction = Vector3.UP
-	particle.gravity = Vector3(0.0, -8.0, 0.0)
-	particle.initial_velocity_min = 2.3
-	particle.initial_velocity_max = 4.8
-	particle.emitting = false
-	add_child(particle)
-	particle.global_position = location
-	particle.emitting = true
-	get_tree().create_timer(0.42).timeout.connect(particle.queue_free)
+	RetroFX.sparks(location, color, count)
 
 
 func _draw_attack(actor: Combatant, instance: MeshInstance3D) -> void:
