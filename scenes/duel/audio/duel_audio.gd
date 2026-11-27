@@ -32,6 +32,10 @@ const POOLS := {
 	&"posture_break": ["posture_break"],
 	&"knockdown": ["knockdown"],
 	&"exhausted": ["exhausted"],
+	&"portal_open": ["portal_open"],
+	&"portal_enter": ["portal_enter"],
+	&"ambush": ["ambush"],
+	&"bonfire": ["bonfire"],
 }
 const STINGER_CUES: Array[StringName] = [&"victory", &"defeat"]
 const VOLUME_DB := -4.0

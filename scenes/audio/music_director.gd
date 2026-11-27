@@ -19,6 +19,12 @@ const AREAS := {
 		"combat": ["res://assets/audio/music/ruins_combat_rhythm.ogg", "res://assets/audio/music/ruins_combat_lead.ogg",
 			"res://assets/audio/music/ruins_combat_phase.ogg"],
 	},
+	# The Thornwood explores to its own night score and fights to the ruins' combat theme.
+	&"forest": {
+		"explore": ["res://assets/audio/music/forest_base.ogg", "res://assets/audio/music/forest_melody.ogg"],
+		"combat": ["res://assets/audio/music/ruins_combat_rhythm.ogg", "res://assets/audio/music/ruins_combat_lead.ogg",
+			"res://assets/audio/music/ruins_combat_phase.ogg"],
+	},
 }
 const STINGERS := {
 	&"victory": "res://assets/audio/music/victory.ogg",

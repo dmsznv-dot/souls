@@ -11,6 +11,8 @@ const PRESETS := {
 	&"clear": {"wind": 0.25, "gusts": 0.4, "rain": 0.0, "storm": 0.0, "debris": 0.4},
 	&"court": {"wind": 0.45, "gusts": 0.8, "rain": 0.25, "storm": 0.0, "debris": 1.0},
 	&"ruins": {"wind": 0.65, "gusts": 1.0, "rain": 0.85, "storm": 1.0, "debris": 0.8},
+	# Under the canopy: a dry, still night, leaves drifting down, the odd gust in the crowns.
+	&"forest": {"wind": 0.3, "gusts": 0.55, "rain": 0.0, "storm": 0.0, "debris": 1.0},
 }
 const RAIN_LOOP := "res://assets/audio/ambience/rain.ogg"
 const THUNDER := ["res://assets/audio/ambience/thunder_0.ogg", "res://assets/audio/ambience/thunder_1.ogg"]

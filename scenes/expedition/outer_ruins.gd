@@ -44,6 +44,7 @@ func _ready() -> void:
 		remaining_enemies = _area.remaining
 		_update_status())
 	_area.cleared.connect(_finish.bind(&"victory"))
+	_area.portal_entered.connect(_through_portal)
 	_update_status()
 
 
@@ -99,6 +100,14 @@ func _finish(result: StringName) -> void:
 	_audio.play_cue(result, _hero.body.global_position)
 	_result_title.text = "THE RUINS FALL SILENT" if result == &"victory" else "YOU FELL"
 	get_tree().create_timer(0.55).timeout.connect(_result.show)
+	if result == &"victory":
+		# The hero walks on: the eclipse ring opens toward the Thornwood.
+		$Player.can_fight = true
+		get_tree().create_timer(3.0).timeout.connect(func() -> void:
+			_result.hide()
+			_area.open_portal()
+			_audio.play_cue(&"portal_open", _area.portal.global_position + _area.portal.CENTER)
+			_set_notice("The eclipse ring stirs"))
 
 
 func _play_feedback(cue: StringName, at: Vector3, strength: float = 0.5) -> void:
@@ -114,6 +123,13 @@ func _play_feedback(cue: StringName, at: Vector3, strength: float = 0.5) -> void
 		&"nova": RetroFX.shockwave(at, 2.8, Color(0.66, 0.58, 1.0))
 		&"critical": _set_notice("Critical")
 		&"no_focus": _set_notice("Not enough focus")
+
+
+func _through_portal() -> void:
+	_audio.play_cue(&"portal_enter", $Player.global_position)
+	RetroFX.flash(0.3, Color(0.62, 0.48, 1.0))
+	$Player.can_fight = false
+	RetroFX.pass_through(Color(0.08, 0.05, 0.16), get_tree().change_scene_to_file.bind("res://scenes/forest/forest.tscn"))
 
 
 func _set_notice(message: String) -> void:

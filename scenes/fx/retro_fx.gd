@@ -15,6 +15,7 @@ var _rect: ColorRect
 var _material: ShaderMaterial
 var _flash: float
 var _last_flash_ms: int = -100000
+var _veil: ColorRect
 
 
 func _ready() -> void:
@@ -39,6 +40,23 @@ func _process(delta: float) -> void:
 	if _flash > 0.0:
 		_flash = maxf(0.0, _flash - delta / maxf(Engine.time_scale, 0.05) * 5.0)
 		_material.set_shader_parameter(&"flash", _flash)
+
+
+## Fades the screen to a colour, runs midpoint (a teleport or a scene change) while covered,
+## then fades back. A slow fade, not a flash: safe for photosensitive players.
+func pass_through(color: Color, midpoint: Callable, half: float = 0.45) -> void:
+	if _veil == null:
+		_veil = ColorRect.new()
+		_veil.name = "Veil"
+		_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_veil.set_anchors_preset(Control.PRESET_FULL_RECT)
+		add_child(_veil)
+	_veil.color = Color(color, 0.0)
+	var tween := create_tween()
+	tween.tween_property(_veil, ^"color:a", 1.0, half).set_trans(Tween.TRANS_SINE)
+	tween.tween_callback(midpoint)
+	tween.tween_interval(0.2)
+	tween.tween_property(_veil, ^"color:a", 0.0, half * 1.6).set_trans(Tween.TRANS_SINE)
 
 
 ## Brief full-screen tint. Rate-limited to stay under three flashes per second (WCAG 2.3.1).

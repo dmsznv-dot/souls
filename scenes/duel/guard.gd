@@ -64,6 +64,9 @@ var _has_path: bool
 var _plan: Array = []
 ## Blows thrown in the current string, and the weight of the last one.
 var _blows: int = 0
+var _leap_in_velocity := Vector3.ZERO
+var _leap_in_time: float
+var _leap_in_duration: float
 var _stuck_time: float
 var _unstick_time: float
 var _unstick_dir := Vector3.ZERO
@@ -156,6 +159,12 @@ func _physics_process(delta: float) -> void:
 	elif ai_enabled and is_instance_valid(player):
 		_track_windup(delta)
 	var leaping := _leap_motion(delta)
+	if _leap_in_time > 0.0:
+		_leap_in_time -= delta
+		leaping = _leap_in_velocity
+		if is_on_floor() and _leap_in_time < _leap_in_duration * 0.6:
+			_leap_in_time = 0.0
+			_rig.absorb(0.8)
 	_spin(delta)
 	var horizontal := Vector3(velocity.x, 0.0, velocity.z)
 	if _combat.contact_frozen:
@@ -183,6 +192,25 @@ func _physics_process(delta: float) -> void:
 
 ## Wanting to walk but barely moving (a body or prop in the way the path did not foresee) for
 ## a moment sends the foe sideways around it for a second.
+## Breaks cover: a ballistic leap onto target (an ambush from the trees), then the hunt.
+func leap_in(target: Vector3, duration: float = 0.8) -> void:
+	var offset := target - global_position
+	var flat := Vector3(offset.x, 0.0, offset.z)
+	_leap_in_velocity = flat / duration
+	_leap_in_duration = duration
+	_leap_in_time = duration
+	# Gravity runs at 1.3 g rising and 1.8 g falling; 1.55 g lands close enough.
+	var g := get_gravity().length() * 1.55
+	velocity = _leap_in_velocity
+	velocity.y = (offset.y + 0.5 * g * duration * duration) / duration
+	if flat.length_squared() > 0.01:
+		_heading.rotation.y = atan2(-flat.x, -flat.z)
+	_combat.start_jump(duration)
+	_post = target
+	_engage()
+	_last_seen = player.global_position if is_instance_valid(player) else target
+
+
 func _watch_progress(wanted: Vector3, delta: float) -> void:
 	var real := get_real_velocity()
 	real.y = 0.0

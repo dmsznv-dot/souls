@@ -5,6 +5,10 @@ extends "res://scenes/duel/courtyard_duel.gd"
 ## inside the gate's archway, crossfade the score and switch the HUD.
 
 const RUINS_AREA := "res://scenes/expedition/outer_ruins_area.tscn"
+const FOREST_AREA := "res://scenes/forest/forest_area.tscn"
+const ForestArea = preload("res://scenes/forest/forest_area.gd")
+## The Thornwood lies far from the court; only the eclipse ring leads there.
+const FOREST_OFFSET := Vector3(600.0, 0.0, 0.0)
 const OuterRuins = preload("res://scenes/expedition/outer_ruins.gd")
 ## Places the ruins' entrance arch just behind the court's seal gate.
 const RUINS_OFFSET := Vector3(0.0, 0.0, -25.2)
@@ -14,6 +18,8 @@ const BORDER_MARGIN := 0.4
 
 var zone: StringName = &"court"
 var ruins: Node3D
+var forest: ForestArea
+var _forest_fallen: bool
 var ruins_outcome: StringName
 var _ruins_scene: PackedScene
 var _ruins_announced: bool
@@ -34,16 +40,25 @@ func _process(delta: float) -> void:
 	_track_zone()
 	if zone == &"ruins" and ruins != null:
 		_show_ruins_hud()
+	elif zone == &"forest":
+		_hero_caption.text = "THE THORNWOOD" + ("   /   BONFIRE LIT" if forest.bonfire_lit else "")
+		$Interface/GuardMeters.visible = false
 
 
 func _update_music() -> void:
-	if zone == &"ruins" and ruins != null:
+	if zone == &"forest":
+		Music.set_intensity(2 if forest.engaged() and not _forest_fallen else 1)
+	elif zone == &"ruins" and ruins != null:
 		Music.set_intensity(2 if ruins_outcome == &"" and ruins.engaged() else (0 if ruins_outcome == &"defeat" else 1))
 	else:
 		super()
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"restart_duel") and _forest_fallen:
+		_rise_in_forest()
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed(&"interact") and outcome == &"victory" and _gate_prompt != null:
 		if not _gate.is_open and _gate_prompt.global_position.distance_to(_hero.body.global_position + Vector3.UP * 1.45) < GATE_DISTANCE:
 			open_gate()
@@ -60,6 +75,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func open_gate() -> void:
 	_gate_prompt.hide()
 	_spawn_ruins()
+	_start_forest()
 	_gate.open()
 	_audio.play_cue(&"gate_open", _gate_prompt.global_position)
 	$Player/CameraRig.add_trauma(0.45)
@@ -84,6 +100,9 @@ func respawn_in_ruins() -> void:
 
 
 func _finish(result: StringName) -> void:
+	if result == &"defeat" and zone == &"forest":
+		_forest_fall()
+		return
 	if result == &"defeat" and outcome == &"victory":
 		# Falling past the gate: the Gatekeeper stays dead, the ruins reset at their entrance.
 		_ruins_finish(&"defeat")
@@ -107,13 +126,14 @@ func _spawn_ruins() -> void:
 	for enemy in ruins.enemies():
 		enemy.get_node("Combat").feedback.connect(_on_feedback)
 	ruins.cleared.connect(_ruins_finish.bind(&"victory"))
+	ruins.portal_entered.connect(_enter_forest)
 	ruins.enemy_defeated.connect(func(_enemy: Node) -> void: _show_notice("%d LEFT" % ruins.remaining, 1.2))
 	Music.attach_torches(ruins)
 	Weather.bind_area(self)
 
 
 func _track_zone() -> void:
-	if not _gate.is_open:
+	if not _gate.is_open or zone == &"forest":
 		return
 	var z: float = $Player.global_position.z
 	var next := zone
@@ -162,3 +182,101 @@ func _ruins_finish(result: StringName) -> void:
 	get_tree().create_timer(0.55).timeout.connect(_result.show)
 	if result == &"victory":
 		get_tree().create_timer(3.5).timeout.connect(_result.hide)
+		get_tree().create_timer(3.8).timeout.connect(_open_eclipse)
+
+
+
+# ---------------------------------------------------------------- the Thornwood
+
+## The forest is built a little each frame from the moment the seal burns, far from the court,
+## so it is ready long before the eclipse ring opens.
+func _start_forest() -> void:
+	if forest != null:
+		return
+	forest = (load(FOREST_AREA) as PackedScene).instantiate()
+	forest.name = "ThornwoodArea"
+	forest.active = false
+	add_child(forest)
+	forest.position = FOREST_OFFSET
+	forest.reset_physics_interpolation()
+	forest.foe_spawned.connect(func(foe: CharacterBody3D) -> void: foe.get_node("Combat").feedback.connect(_on_feedback))
+	forest.rested.connect(_on_forest_rested)
+	forest.ambushed.connect(func(at: Vector3) -> void: _audio.play_cue(&"ambush", at, 1.0))
+	await forest.setup($Player, true)
+	forest.set_active(zone == &"forest")
+	Music.attach_torches(forest)
+
+
+func _open_eclipse() -> void:
+	if ruins == null or ruins_outcome != &"victory":
+		return
+	ruins.open_portal()
+	_audio.play_cue(&"portal_open", ruins.portal.to_global(ruins.portal.CENTER))
+	_show_notice("The eclipse ring stirs", 2.6)
+
+
+func _enter_forest() -> void:
+	if forest == null or not forest.built:
+		_show_notice("The eclipse has not yet settled", 1.6)
+		return
+	_audio.play_cue(&"portal_enter", $Player.global_position)
+	$Player.can_fight = false
+	RetroFX.pass_through(Color(0.08, 0.05, 0.16), _arrive_in_forest)
+
+
+func _arrive_in_forest() -> void:
+	zone = &"forest"
+	forest.set_active(true)
+	_place_player(forest.entrance_transform())
+	$Player.can_fight = true
+	for holder in find_children("*", "WorldEnvironment", true, false):
+		if not forest.is_ancestor_of(holder):
+			(holder as WorldEnvironment).environment = ForestArea.environment()
+	for light in find_children("*", "DirectionalLight3D", true, false):
+		ForestArea.tune_moon(light)
+	if ruins != null:
+		ruins.set_backdrop_visible(false)
+	_court_hills.visible = false
+	Music.play_area(&"forest", 2.5)
+	Weather.set_preset(&"forest")
+	Weather.bind_area(forest)
+	_show_notice("THE THORNWOOD", 2.6)
+
+
+func _place_player(at: Transform3D) -> void:
+	var player := $Player as CharacterBody3D
+	player.global_transform = at
+	player.velocity = Vector3.ZERO
+	player.reset_physics_interpolation()
+	player.get_node("Heading").rotation.y = 0.0
+	var camera := player.get_node("CameraRig")
+	camera.lock_target = null
+	camera.rotation.y = 0.0
+	camera.snap()
+
+
+func _forest_fall() -> void:
+	if _forest_fallen:
+		return
+	_forest_fallen = true
+	$Player.can_fight = false
+	_audio.play_cue(&"defeat", _hero.body.global_position)
+	_result_title.text = "YOU FELL"
+	$Interface/Result/Messages/Retry.text = "T / Menu   Rise at the bonfire" if forest.bonfire_lit else "T / Menu   Rise at the forest's edge"
+	get_tree().create_timer(0.55).timeout.connect(_result.show)
+
+
+func _rise_in_forest() -> void:
+	_forest_fallen = false
+	_result.hide()
+	forest.reset_foes()
+	_place_player(forest.respawn_transform())
+	_hero.revive()
+	$Player.can_fight = true
+
+
+func _on_forest_rested() -> void:
+	_hero.revive()
+	_audio.play_cue(&"bonfire", forest.bonfire_transform().origin, 1.0)
+	_show_notice("BONFIRE LIT" if not has_meta(&"rested_once") else "Rested  ·  The forest stirs again", 2.6)
+	set_meta(&"rested_once", true)

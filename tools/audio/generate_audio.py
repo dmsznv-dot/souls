@@ -687,6 +687,110 @@ def impact_sfx() -> None:
     write("sfx/exhausted", normalize(fade(gasp), -10))
 
 
+def forest_audio() -> None:
+    """The Thornwood: night ambience, a sparse exploration score, portal, ambush and bonfire."""
+    local = np.random.default_rng(777)
+    # Night ambience: crickets in pulsing choruses, a far owl, leaves stirring. Stereo loop.
+    seconds = 20.0
+    length = int(seconds * SR)
+    night = np.zeros((length, 2))
+    leaves = bp(noise(length), 900, 4000) * (0.4 + 0.6 * np.abs(lp(noise(length), 0.6, 1)) * 40)
+    leaves = np.clip(leaves, -1, 1) * 0.12
+    night[:, 0] += leaves
+    night[:, 1] += np.roll(leaves, int(0.21 * SR))
+    for voice in range(5):
+        pitch = local.uniform(4200, 5600)
+        rate = local.uniform(14, 22)
+        pan = local.uniform(0.15, 0.85)
+        chirp_len = int(0.035 * SR)
+        chirp = np.sin(2 * np.pi * pitch * t_axis(0.035)) * np.hanning(chirp_len)
+        at = local.uniform(0, 1.0)
+        while at < seconds - 0.1:
+            burst = local.integers(3, 7)
+            for b in range(burst):
+                pos = int((at + b / rate) * SR) % length
+                end = min(pos + chirp_len, length)
+                night[pos:end, 0] += chirp[:end - pos] * (1 - pan) * 0.05
+                night[pos:end, 1] += chirp[:end - pos] * pan * 0.05
+            at += local.uniform(0.6, 1.6)
+    for at in [3.0, 3.55, 13.0]:
+        hoot_len = int(0.45 * SR)
+        hoot = np.sin(2 * np.pi * np.cumsum(np.linspace(420, 370, hoot_len)) / SR) * env_adsr(hoot_len, 0.08, 0.1, 0.7, 0.2)
+        hoot = reverb(hoot, 2.4, 0.5, 3000)[:hoot_len * 3]
+        if hoot.ndim == 2:
+            hoot = hoot.mean(axis=1)
+        pos = int(at * SR)
+        night[pos:pos + len(hoot), 0] += hoot[:length - pos] * 0.05
+        night[pos:pos + len(hoot), 1] += hoot[:length - pos] * 0.08
+    write("ambience/forest_night", rms_normalize(night, -27), True)
+
+    # Exploration score: slow D minor, a low string drone, a heartbeat drum, a lonely recorder.
+    bpm, bars = 66, 16
+    beat = 60 / bpm
+    bar_s = 4 * beat
+    length_s = bars * bar_s
+    length = int(length_s * SR)
+    base = np.zeros(length)
+    base += hurdy_drone([n("D2"), n("A2")], length_s) * 0.16
+    chords = ["Dm", "Dm", "Bb", "Bb", "Gm", "Gm", "A", "A", "Dm", "Dm", "F", "F", "Gm", "Bb", "A", "A"]
+    shapes = {"Dm": ["D3", "F3", "A3"], "Bb": ["Bb2", "D3", "F3"], "Gm": ["G2", "Bb2", "D3"],
+              "A": ["A2", "C#3", "E3"], "F": ["F2", "A2", "C3"]}
+    for i, chord in enumerate(chords):
+        if i % 2 == 0:
+            for v in shapes[chord]:
+                place_wrapped(base, pad_voice(n(v), 2 * bar_s + 1.5, 800, 14), i * bar_s, 0.08)
+        for k in [0, 2]:
+            place_wrapped(base, frame_drum(True), i * bar_s + k * beat, 0.22 if k == 0 else 0.12)
+    tune = [("A4", 3), ("F4", 1), ("E4", 2), ("D4", 2), ("C4", 4), ("D4", 4),
+            ("F4", 2), ("G4", 2), ("A4", 3), ("C5", 1), ("Bb4", 4), ("A4", 4),
+            ("D5", 3), ("C5", 1), ("A4", 2), ("F4", 2), ("G4", 4), ("E4", 4),
+            ("F4", 2), ("E4", 2), ("D4", 2), ("C#4", 2), ("D4", 8)]
+    melody = np.zeros(length)
+    at = 0.0
+    for name, beats in tune:
+        place_wrapped(melody, recorder(n(name), beats * beat * 0.95), at, 0.3)
+        at += beats * beat
+    assert abs(at - length_s) < 1e-6, (at, length_s)
+    write("music/forest_base", rms_normalize(loop_reverb(base, seconds=3.0, wet=0.4, tone=3500), -22), True)
+    write("music/forest_melody", rms_normalize(loop_reverb(melody, seconds=3.2, wet=0.45, tone=5000), -24), True)
+
+    # Portal opening: a rising shimmer over a low swell. Stepping through: a rush and a boom.
+    length = int(3.6 * SR)
+    shimmer = np.zeros(length)
+    for k in range(6):
+        f = midi(n("D5")) * [1, 1.5, 2, 2.5, 3, 4][k]
+        tone = np.sin(2 * np.pi * f * t_axis(3.6) + local.uniform(0, 6)) * env_adsr(length, 1.6, 0.3, 0.8, 1.2)
+        shimmer += tone * (0.3 / (k + 1)) * (1 + 0.3 * np.sin(2 * np.pi * (3 + k) * t_axis(3.6)))
+    place(shimmer, thump(3.0, 50, 70, 1.6), 0.0, 0.6)
+    shimmer += whoosh(3.6, 300, 6000, 0.8) * 0.25
+    write("sfx/portal_open", normalize(fade(reverb(shimmer, 2.6, 0.45, 7000), 0.01, 0.6), -3))
+    length = int(2.2 * SR)
+    rush = whoosh(2.2, 120, 8000, 0.35, 0.4) * 0.9
+    place(rush, thump(1.4, 70, 25, 0.5), 0.3, 1.2)
+    write("sfx/portal_enter", normalize(fade(reverb(rush, 2.0, 0.35, 5000), 0.005, 0.5), -2))
+
+    # Ambush: branches snapping and leaves thrashing, then a low snarl.
+    length = int(1.4 * SR)
+    burst = np.zeros(length)
+    place(burst, bp(noise(int(0.6 * SR)), 700, 5000) * env_adsr(int(0.6 * SR), 0.01, 0.15, 0.4, 0.3), 0.0, 0.8)
+    for k in range(6):
+        snap_len = int(0.03 * SR)
+        place(burst, hp(noise(snap_len), 1200) * exp_decay(snap_len, 0.006), local.uniform(0, 0.35), local.uniform(0.5, 1.0))
+    growl_len = int(0.9 * SR)
+    growl = saw(55, 0.9) * (0.6 + 0.4 * np.sin(2 * np.pi * 23 * t_axis(0.9))) * env_adsr(growl_len, 0.1, 0.2, 0.6, 0.4)
+    place(burst, lp(growl, 600), 0.25, 0.5)
+    write("sfx/ambush", normalize(fade(burst), -3))
+
+    # Bonfire kindling: a whoomp of catching flame and a low warm chord.
+    length = int(3.0 * SR)
+    kindle = np.zeros(length)
+    place(kindle, lp(noise(int(1.2 * SR)), 900) * env_adsr(int(1.2 * SR), 0.15, 0.3, 0.4, 0.6), 0.0, 0.9)
+    place(kindle, thump(0.8, 90, 40, 0.3), 0.05, 0.8)
+    for note in ["D3", "A3", "F4"]:
+        place(kindle, pad_voice(n(note), 2.6, 1200, 6), 0.2, 0.12)
+    write("sfx/bonfire", normalize(fade(reverb(kindle, 2.2, 0.35, 4000), 0.01, 0.8), -3))
+
+
 # ---------------------------------------------------------------- music
 
 def court_music() -> None:
@@ -875,3 +979,4 @@ if __name__ == "__main__":
     notice_stinger()
     weather_audio()
     impact_sfx()
+    forest_audio()

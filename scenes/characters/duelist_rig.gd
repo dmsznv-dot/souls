@@ -578,6 +578,20 @@ func set_weapon(next: SoulsWeapon) -> void:
 	_trail.color = weapon.trail_color
 	_trail.clear()
 
+## Shifts every body material toward a colour (moss and bark for forest kin). Materials are
+## copied so other bodies of the same kind keep theirs.
+func tint(color: Color, amount: float) -> void:
+	var copies := {}
+	for part in find_children("*", "MeshInstance3D", true, false):
+		var material := part.material_override as StandardMaterial3D
+		if material == null or material.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED or part.name == &"BladeTrail":
+			continue
+		if not copies.has(material):
+			var copy := material.duplicate() as StandardMaterial3D
+			copy.albedo_color = material.albedo_color.lerp(color, amount)
+			copies[material] = copy
+		part.material_override = copies[material]
+
 ## Sword arm follows the clip's blade path; a two-handed weapon also pulls the off hand onto
 ## the grip. Weight ramps at both ends of the clip so the IK pose blends with the authored body.
 func _drive_arms(clip: StringName, phase: float) -> void:
