@@ -655,12 +655,28 @@ func _bone_basis(bone_vector: Vector3, toward: Vector3) -> Basis:
 	z = z.normalized()
 	return Basis(y.cross(z), y, z).orthonormalized()
 
+## Where in its clip an action stands. A knockdown falls, lies still, then plays the fall
+## backwards to rise; a daze holds the recoil and sways around it.
+func _clip_phase(action: StringName, phase: float) -> float:
+	match action:
+		&"knockdown":
+			if phase < 0.28:
+				return ease(phase / 0.28, 0.6)
+			if phase < 0.72:
+				return 1.0
+			return 1.0 - smoothstep(0.72, 1.0, phase)
+		&"dazed":
+			return 0.32 + 0.1 * sin(phase * TAU * 2.5) * (1.0 - smoothstep(0.8, 1.0, phase)) - 0.28 * smoothstep(0.85, 1.0, phase)
+	return phase
+
 ## Action name -> clip, per body plan. Zombies claw, brutes punch, everyone rolls with mocap.
 func _clip_for(action: StringName) -> StringName:
 	match action:
 		&"roll": return &"mocap_roll"
 		&"flinch": return &"hit_head" if creature == BRUTE else &"hit_chest"
 		&"dead": return &"death"
+		&"knockdown": return &"hit_knockback"
+		&"dazed": return &"stagger"
 	match creature:
 		ZOMBIE:
 			if action in [&"enemy_slash", &"enemy_thrust", &"light"]:
@@ -673,7 +689,7 @@ func _clip_for(action: StringName) -> StringName:
 ## Lying poses rest on the floor whatever the body plan and scale: the lowest vertex of the
 ## body (cape, held weapon and club aside) is brought to the ground. Once the clip has settled
 ## the correction is kept instead of measured again every step.
-func _ground_body(phase: float) -> void:
+func _ground_body(phase: float, dying: bool) -> void:
 	var cape := skeleton.find_bone("Cape")
 	if phase >= 1.0 and _ground_settled:
 		var pelvis := skeleton.get_bone_pose_position(0)
@@ -681,7 +697,7 @@ func _ground_body(phase: float) -> void:
 		skeleton.set_bone_pose_rotation(cape, _ground_cape)
 		return
 	if _body_points.is_empty():
-		_collect_body_points()
+		_collect_body_points(not dying)
 	var lowest := INF
 	for entry: Array in _body_points:
 		var pose := skeleton.get_bone_global_pose(entry[0])
@@ -695,11 +711,11 @@ func _ground_body(phase: float) -> void:
 	_lay_cape()
 	_ground_cape = skeleton.get_bone_pose_rotation(cape)
 	_ground_settled = phase >= 1.0
-	if _club != null and not _club.top_level:
+	if dying and _club != null and not _club.top_level:
 		_drop_club()
 
 ## Vertices of every visible body part, in the space of the bone that carries it.
-func _collect_body_points() -> void:
+func _collect_body_points(with_club: bool) -> void:
 	for attachment in skeleton.get_children():
 		if not attachment is BoneAttachment3D or attachment.name == &"Cape":
 			continue
@@ -707,7 +723,7 @@ func _collect_body_points() -> void:
 		for part in attachment.find_children("*", "MeshInstance3D", true, false):
 			if part.mesh == null or not part.visible or part.name == &"BladeTrail":
 				continue
-			if (_weapon_root != null and _weapon_root.is_ancestor_of(part)) or (_club != null and (_club == part or _club.is_ancestor_of(part))):
+			if (_weapon_root != null and _weapon_root.is_ancestor_of(part)) or (not with_club and _club != null and (_club == part or _club.is_ancestor_of(part))):
 				continue
 			var local := Transform3D.IDENTITY
 			var node: Node = part
@@ -860,7 +876,7 @@ func apply_motion(clip: StringName, phase: float, local_motion: Vector2, delta: 
 		_:
 			var window: Vector2 = CLIP_WINDOWS.get(clip, Vector2(0.0, 1.0))
 			var length := player.get_animation(clip).length
-			player.seek(lerpf(window.x, window.y, phase) * length,true)
+			player.seek(lerpf(window.x, window.y, _clip_phase(action_clip, phase)) * length,true)
 	clip = action_clip
 	if clip == &"dead" and phase > 0.7 and not _weapon_dropped:
 		_drop_weapon()
@@ -881,7 +897,7 @@ func apply_motion(clip: StringName, phase: float, local_motion: Vector2, delta: 
 	_apply_weight(delta)
 	_drive_arms(clip, phase)
 	if clip in [&"dead", &"knockdown"]:
-		_ground_body(phase)
+		_ground_body(phase, clip == &"dead")
 	elif _ground_settled or not _body_points.is_empty():
 		_ground_settled = false
 		_body_points.clear()
@@ -890,11 +906,27 @@ func apply_motion(clip: StringName, phase: float, local_motion: Vector2, delta: 
 		var chest := skeleton.find_bone("Chest")
 		var tilt := Basis.from_euler(Vector3(-lean.y, 0.0, lean.x).limit_length(0.16))
 		skeleton.set_bone_pose_rotation(chest, (tilt * Basis(skeleton.get_bone_pose_rotation(chest))).get_rotation_quaternion())
+	if clip == &"winded":
+		# Spent after a string: shoulders drop and the chest heaves.
+		var heave := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.011)
+		var settle := smoothstep(0.0, 0.25, phase) * (1.0 - smoothstep(0.8, 1.0, phase))
+		for entry in [["Chest", 0.3 + 0.08 * heave], ["Head", 0.18]]:
+			var bone := skeleton.find_bone(entry[0])
+			var slump := Basis(Vector3.RIGHT, -entry[1] * settle)
+			skeleton.set_bone_pose_rotation(bone, (slump * Basis(skeleton.get_bone_pose_rotation(bone))).get_rotation_quaternion())
+	if clip == &"dazed":
+		# Reeling: the head lolls and the chest circles, slower as the daze wears off.
+		var t := Time.get_ticks_msec() * 0.001
+		var fade := 1.0 - smoothstep(0.8, 1.0, phase)
+		for entry in [["Head", 0.32, 0.0], ["Chest", 0.12, 1.3]]:
+			var bone := skeleton.find_bone(entry[0])
+			var wobble := Basis.from_euler(Vector3(sin(t * 3.1 + entry[2]) * 0.5, sin(t * 2.3 + entry[2]), cos(t * 3.1 + entry[2])) * entry[1] * fade)
+			skeleton.set_bone_pose_rotation(bone, (wobble * Basis(skeleton.get_bone_pose_rotation(bone))).get_rotation_quaternion())
 	if _jaw != null:
 		var open := 0.08 + 0.05 * sin(breath_clock * TAU * 2.0)
 		if clip in STRIKE_CLIPS and phase > 0.4 and phase < 0.75:
 			open = 0.42
-		elif clip == &"stagger" or clip == &"dead":
+		elif clip in [&"stagger", &"dead", &"dazed", &"knockdown"]:
 			open = 0.55
 		_jaw.rotation.x = lerpf(_jaw.rotation.x, open, 1.0 - exp(-18.0 * delta))
 	var segment := blade_segment()

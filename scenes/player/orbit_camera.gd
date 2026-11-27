@@ -18,6 +18,11 @@ var lock_target: Marker3D
 var _mouse_motion: Vector2
 var _using_mouse: bool = true
 var _lock_requested: bool
+## Sideways look input gathered while locked; a flick past the threshold switches target.
+var _switch_push: float
+var _switch_cooldown: float
+var _stick_centered := true
+const SWITCH_THRESHOLD := 0.22
 var _occlusion_time: float
 var _camera_distance: float
 var _anchor_offset: Vector3
@@ -83,6 +88,19 @@ func update_orbit(delta: float) -> void:
 	_follow.y = lerpf(_follow.y, goal.y, 1.0 - exp(-vertical_follow_rate * delta))
 	global_position = _follow
 	_update_lock(delta)
+	_switch_cooldown = maxf(0.0, _switch_cooldown - delta)
+	if is_instance_valid(lock_target):
+		# Flick the mouse or the right stick sideways to move the lock to the next foe that way.
+		var stick_x := Input.get_axis(&"look_left", &"look_right")
+		_switch_push = _switch_push * exp(-8.0 * delta) + _mouse_motion.x * mouse_sensitivity
+		var flick := 0.0
+		if absf(_switch_push) > SWITCH_THRESHOLD:
+			flick = signf(_switch_push)
+		elif _stick_centered and absf(stick_x) > 0.8:
+			flick = signf(stick_x)
+		_stick_centered = absf(stick_x) < 0.3
+		if flick != 0.0 and _switch_cooldown == 0.0:
+			switch_target(flick)
 	if is_instance_valid(lock_target):
 		var offset := lock_target.global_position - global_position
 		var target_yaw := atan2(-offset.x, -offset.z) + lock_yaw_offset
@@ -137,12 +155,43 @@ func _update_lock(delta: float) -> void:
 			if _occlusion_time >= occlusion_grace_time:
 				lock_target = null
 	else:
-		lock_target = null
+		# The locked foe fell (its marker hides): carry the lock to the next one in view, as
+		# Souls games do. A marker freed with its streamed area just drops the lock.
+		lock_target = _find_target() if is_instance_valid(lock_target) else null
+		_occlusion_time = 0.0
 
 	if _lock_requested:
 		lock_target = null if is_instance_valid(lock_target) else _find_target()
 		_occlusion_time = 0.0
 		_lock_requested = false
+
+
+## Moves the lock to the nearest other target on that side of the screen (-1 left, 1 right).
+func switch_target(side: float) -> bool:
+	_switch_push = 0.0
+	_switch_cooldown = 0.3
+	if not is_instance_valid(lock_target):
+		return false
+	var current := _camera.unproject_position(lock_target.global_position)
+	var best: Marker3D
+	var best_gap := INF
+	for node in get_tree().get_nodes_in_group(&"lock_targets"):
+		var target := node as Marker3D
+		if target == null or target == lock_target or not target.is_visible_in_tree():
+			continue
+		var point := target.global_position
+		if (global_position.distance_squared_to(point) > lock_range * lock_range
+				or not _camera.is_position_in_frustum(point) or not _can_see_target(point)):
+			continue
+		var gap := (_camera.unproject_position(point).x - current.x) * side
+		if gap > 4.0 and gap < best_gap:
+			best = target
+			best_gap = gap
+	if best == null:
+		return false
+	lock_target = best
+	_occlusion_time = 0.0
+	return true
 
 
 func _find_target() -> Marker3D:

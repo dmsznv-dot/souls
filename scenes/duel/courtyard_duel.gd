@@ -131,8 +131,10 @@ func _on_feedback(cue: StringName, location: Vector3, strength: float = 0.5) -> 
 			_sparks(location, Color(1.0, 0.50, 0.26), 14)
 		&"block":
 			_sparks(location, Color(1.0, 0.80, 0.41), 9)
-		&"hit":
-			_sparks(location, Color(1.0, 0.64, 0.42), 7)
+		&"posture_break":
+			_show_notice("Posture broken  ·  Strike now", 1.1)
+		&"exhausted":
+			_show_notice("Exhausted")
 		&"shockwave":
 			RetroFX.shockwave(location, 3.0)
 		&"nova":

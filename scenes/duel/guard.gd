@@ -62,6 +62,9 @@ var _visible: bool
 var _sight_delay: float
 var _has_path: bool
 var _plan: Array = []
+## Blows thrown in the current string, and the weight of the last one.
+var _blows: int = 0
+var _last_impact: float = 0.0
 var _last_move: StringName
 var _retreat: float
 var _backstep: float
@@ -90,6 +93,10 @@ func _ready() -> void:
 	_post = global_position
 	_strafe_dir = 1.0 if randf() < 0.5 else -1.0
 	_combat.feedback.connect(_on_own_feedback)
+	if boss_enabled:
+		# A boss is never bowled over, and only heavy, repeated blows make it flinch.
+		_combat.steady = true
+		_combat.poise = 120.0
 	_combat.defeated.connect(func() -> void: _director_release())
 	if boss_enabled:
 		_combat.max_health = 154.0
@@ -170,11 +177,13 @@ func _physics_process(delta: float) -> void:
 
 
 func _after_action(previous: StringName) -> void:
-	var hurt := previous in [&"stagger", &"flinch"]
+	var hurt := previous in [&"stagger", &"flinch", &"dazed", &"knockdown"]
 	_cooldown = 0.36 if hurt else attack_rest * randf_range(0.8, 1.5)
+	var attacked := previous not in [&"roll", &"flinch", &"stagger", &"dazed", &"knockdown", &"winded", &"boss_phase", &"dead", &"parry"]
 	_hesitate = -1.0
 	if hurt or previous == &"boss_phase":
 		_plan.clear()
+		_blows = 0
 		if hurt and randf() < backoff_chance:
 			_retreat = randf_range(0.35, 0.6)
 	elif not _plan.is_empty():
@@ -183,10 +192,21 @@ func _after_action(previous: StringName) -> void:
 		if is_instance_valid(player):
 			var offset := player.global_position - global_position
 			_heading.rotation.y = lerp_angle(_heading.rotation.y, atan2(-offset.x, -offset.z), 0.65)
-		_combat.start_attack(_plan.pop_front())
+		var next: DuelAttack = _plan.pop_front()
+		if _combat.start_attack(next):
+			_blows += 1
+			_last_impact = next.impact
 		return
 	else:
 		boss_move = &""
+	if attacked and previous != &"" and _combat.health > 0.0:
+		# A string or a heavy blow leaves the attacker winded: the player's window to answer.
+		var window := _response_window(_blows, _last_impact)
+		_blows = 0
+		if window > 0.0:
+			_combat.start_rest(window)
+			_director_release()
+			return
 	if previous not in [&"roll", &"flinch", &"stagger"]:
 		_director_release()
 	if retreat_after_attack > 0.0 and not hurt and previous != &"dead":
@@ -369,7 +389,7 @@ func _player_opening() -> bool:
 	var threat: Node = player.get_node_or_null("Combat")
 	if threat == null or randf() > punish_chance:
 		return false
-	if threat.action in [&"flinch", &"stagger"] or threat.stamina < 12.0:
+	if threat.action in [&"flinch", &"stagger", &"dazed", &"knockdown"] or threat.exhausted or threat.stamina < 12.0:
 		return true
 	return threat.attack != null and threat.action_age > threat.attack.windup + threat.attack.active
 
@@ -418,11 +438,23 @@ func _director_release() -> void:
 		Director.release(self)
 
 
+## Seconds a foe stands winded after a string of blows or one heavy swing. Bosses and heavies
+## give one or two blows' worth; ordinary foes only after a combo.
+func _response_window(blows: int, impact: float) -> float:
+	if boss_enabled:
+		return (0.95 if blows >= 3 else 0.7) if blows >= 2 or impact >= 0.75 else 0.0
+	if token_cost >= 2:
+		return 0.85 if impact >= 0.6 or blows >= 2 else 0.4
+	return 0.55 if blows >= 2 else 0.0
+
+
 func _attack_now() -> void:
 	if _plan.is_empty():
 		return
 	var definition: DuelAttack = _plan.pop_front()
 	if _combat.start_attack(definition):
+		_blows = 1
+		_last_impact = definition.impact
 		_next_thrust = not _next_thrust
 		if definition.leap > 0.0 and is_instance_valid(player):
 			_leap_target = player.global_position

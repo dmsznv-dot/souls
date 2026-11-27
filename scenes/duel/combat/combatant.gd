@@ -25,6 +25,22 @@ const RESISTANCE := {
 	&"hide": [0.9, 1.15, 0.8, 1.2], &"bone": [0.9, 0.8, 1.25, 1.0],
 }
 const BLADE_SUBSTEPS: int = 6
+## Poise damage fades if no blow lands for this long (Dark Souls resets poise after a pause).
+const POISE_RESET: float = 1.6
+## Poise damage of a blow of impact 1.0.
+const POISE_PER_IMPACT: float = 50.0
+## Posture broken: the foe reels, defenceless, and the next blow lands as a critical.
+const DAZE_DURATION: float = 1.9
+const DAZE_CRITICAL: float = 1.6
+const KNOCKDOWN_DURATION: float = 1.75
+## Knocked down bodies lie still between these fractions of the knockdown; the player cannot be
+## hit again while down, so heavies cannot chain a fallen hero to death.
+const KNOCKDOWN_LYING := Vector2(0.28, 0.72)
+## Running stamina dry stops regeneration this long, instead of the usual short delay.
+const EXHAUSTED_DELAY: float = 1.7
+## Damage and poise multipliers for blows from the flank and from behind, for every weapon.
+const FLANK_BONUS := Vector2(1.08, 1.25)
+const REAR_BONUS := Vector2(1.2, 1.5)
 
 @export var light_attack: AttackData
 @export var heavy_attack: AttackData
@@ -36,6 +52,11 @@ const BLADE_SUBSTEPS: int = 6
 @export var armor: StringName = &""
 ## Multiplies flinch length. Brutes shrug hits off (below 1), small creatures reel longer.
 @export_range(0.0, 4.0, 0.05) var flinch_scale: float = 1.0
+## Poise: poise damage soaked before a blow makes the body flinch. 0 derives it from
+## flinch_scale (28 for an ordinary body, about 11 for husks, 70 for brutes).
+@export_range(0.0, 400.0, 1.0) var poise: float = 0.0
+## Steady bodies (bosses) are never knocked off their feet.
+@export var steady: bool = false
 
 var health: float = 100.0
 var stamina: float = 100.0
@@ -58,6 +79,10 @@ var charge: float
 ## Where projectiles aim. The player's lock target; enemies aim at their quarry.
 var aim_target: Node3D
 var _held: float
+var _poise_damage: float
+var _poise_wait: float
+## True after stamina ran dry, until it has recovered a third of the bar.
+var exhausted: bool
 var _focus_wait: float
 
 var _stamina_wait: float
@@ -105,7 +130,12 @@ func advance(delta: float) -> void:
 
 	_stamina_wait = maxf(0.0, _stamina_wait - delta)
 	if _stamina_wait == 0.0 and not blocking:
-		stamina = minf(100.0, stamina + STAMINA_REGEN * delta)
+		stamina = minf(100.0, stamina + STAMINA_REGEN * (0.7 if exhausted else 1.0) * delta)
+		if exhausted and stamina >= 35.0:
+			exhausted = false
+	_poise_wait = maxf(0.0, _poise_wait - delta)
+	if _poise_wait == 0.0:
+		_poise_damage = 0.0
 	_posture_wait = maxf(0.0, _posture_wait - delta)
 	if _posture_wait == 0.0:
 		posture = minf(100.0, posture + 27.0 * delta)
@@ -217,6 +247,12 @@ func start_jump(duration: float) -> bool:
 	return true
 
 
+## Stands winded after a string of blows: open to the player's answer.
+func start_rest(duration: float) -> void:
+	if action == &"":
+		_set_action(&"winded", duration)
+
+
 func start_boss_phase() -> void:
 	_set_action(&"boss_phase", 0.9)
 	_emit(&"windup", 0.8)
@@ -230,6 +266,8 @@ func revive() -> void:
 	posture = 100.0
 	push = Vector3.ZERO
 	combo_step = 0
+	exhausted = false
+	_poise_damage = 0.0
 	_contact_time = 0.0
 	contact_frozen = false
 	_set_action(&"", 0.0)
@@ -263,10 +301,23 @@ func hyper_armor() -> bool:
 
 
 func is_invulnerable() -> bool:
+	if action == &"knockdown" and opponent_mask == 4:
+		var lying := action_age / KNOCKDOWN_DURATION
+		return lying >= KNOCKDOWN_LYING.x and lying <= KNOCKDOWN_LYING.y
 	return action == &"roll" and action_age >= ROLL_IFRAMES.x and action_age <= ROLL_IFRAMES.y
 
 
-func receive_attack(attacker: Node, incoming: AttackData, shot_source_direction: Vector3 = Vector3.ZERO, power_scale: float = 1.0) -> bool:
+## Poise damage this body soaks before a blow staggers it.
+func poise_limit() -> float:
+	return poise if poise > 0.0 else 28.0 / maxf(flinch_scale, 0.1)
+
+
+## Defenceless states: a dazed or fallen body cannot block, roll or strike back.
+func is_reeling() -> bool:
+	return action in [&"dazed", &"knockdown", &"stagger"]
+
+
+func receive_attack(attacker: Node, incoming: AttackData, shot_source_direction: Vector3 = Vector3.ZERO, power_scale: float = 1.0, poise_scale: float = 1.0) -> bool:
 	if action == &"dead" or is_invulnerable():
 		return false
 	var projectile := shot_source_direction != Vector3.ZERO
@@ -287,7 +338,7 @@ func receive_attack(attacker: Node, incoming: AttackData, shot_source_direction:
 	if frontal and blocking and action == &"":
 		var could_hold := stamina > incoming.block_cost
 		_spend(minf(stamina, incoming.block_cost))
-		_stamina_wait = STAMINA_DELAY
+		_stamina_wait = maxf(_stamina_wait, STAMINA_DELAY)
 		push = away * incoming.knockback() * 0.55
 		if could_hold:
 			_emit(&"block", incoming.impact)
@@ -299,26 +350,88 @@ func receive_attack(attacker: Node, incoming: AttackData, shot_source_direction:
 		return true
 
 	var resist: Array = RESISTANCE.get(armor, [1.0, 1.0, 1.0, 1.0])
-	var damage: float = incoming.damage * power_scale * resist[incoming.damage_type] * (1.5 if _parried else 1.0)
+	var critical := _parried or action == &"dazed"
+	var multiplier := 1.5 if _parried else (DAZE_CRITICAL if action == &"dazed" else 1.0)
+	if action == &"knockdown":
+		multiplier = 1.2
+	var damage: float = incoming.damage * power_scale * resist[incoming.damage_type] * multiplier
 	_parried = false
+	var was := action
 	_damage(damage)
 	push = away * incoming.knockback()
+	_impact_effect(incoming, power_scale * poise_scale)
 	if action == &"dead":
 		_emit(&"death", incoming.impact)
 		return true
 	_emit(&"hit", incoming.impact)
-	posture = maxf(0.0, posture - incoming.posture_damage * power_scale)
+	if critical and was == &"dazed":
+		_emit(&"critical", 1.0)
+	var force := incoming.impact * power_scale * poise_scale
+	posture = maxf(0.0, posture - incoming.posture_damage * power_scale * poise_scale)
 	_posture_wait = 0.90
-	if posture <= 0.0:
+	_poise_damage += force * POISE_PER_IMPACT * (0.4 if hyper_armor() else 1.0)
+	_poise_wait = POISE_RESET
+	var player := opponent_mask == 4
+	if was == &"knockdown":
+		# A fallen body stays down; blows only add to the damage.
+		return true
+	if posture <= 0.0 and not player and not steady and force >= 0.75:
+		# A heavy blow that breaks posture bowls the body over outright.
+		posture = 100.0
+		_knock_down(away, incoming)
+	elif posture <= 0.0 and not player:
+		# Posture broken: the foe reels, open to a critical blow.
+		posture = 100.0
+		_poise_damage = 0.0
+		_set_action(&"dazed", DAZE_DURATION)
+		_emit(&"posture_break", 1.0)
+	elif posture <= 0.0:
 		posture = 100.0
 		_set_action(&"stagger", 0.82)
-	elif hyper_armor():
-		# Committed heavy swings ride through blows (poise), as in Souls games.
+	elif not steady and not hyper_armor() and force >= (0.9 if player else 0.75) and (player or _poise_damage >= poise_limit()):
+		_knock_down(away, incoming)
+	elif hyper_armor() and _poise_damage < poise_limit() * 2.0:
+		# Committed heavy swings ride through blows, as in Souls games, unless battered hard.
 		pass
-	elif action != &"stagger" and (opponent_mask == 4 or incoming.impact * flinch_scale >= 0.85):
-		# The player always flinches; foes flinch once a blow outweighs their poise.
+	elif was == &"dazed" or (was != &"stagger" and (player or _poise_damage >= poise_limit())):
+		# The player always flinches; foes once the blows outweigh their poise.
+		_poise_damage = 0.0
 		_set_action(&"flinch", lerpf(0.3, 0.42, incoming.impact) * clampf(flinch_scale, 0.7, 1.4))
 	return true
+
+
+func _knock_down(away: Vector3, incoming: AttackData) -> void:
+	_poise_damage = 0.0
+	_set_action(&"knockdown", KNOCKDOWN_DURATION)
+	push = away * incoming.knockback() * 1.1
+	_emit(&"knockdown", incoming.impact)
+
+
+## Sparks off plate and bone, dark spatter off flesh and hide, sized by the blow.
+func _impact_effect(incoming: AttackData, weight: float) -> void:
+	var fx := get_node_or_null(^"/root/RetroFX")
+	var where := body.global_position + Vector3.UP * 1.15
+	var strength := clampf(incoming.impact * weight, 0.0, 1.4)
+	var material := impact_material()
+	_emit(StringName("impact_" + material), strength)
+	if fx == null:
+		return
+	match material:
+		&"plate":
+			fx.sparks(where, Color(1.0, 0.82, 0.48), roundi(lerpf(8, 22, strength)))
+		&"bone":
+			fx.sparks(where, Color(0.86, 0.82, 0.7), roundi(lerpf(6, 16, strength)))
+		_:
+			fx.sparks(where, Color(0.42, 0.05, 0.06), roundi(lerpf(6, 18, strength)))
+
+
+## Sound and spatter family of this body's armour.
+func impact_material() -> String:
+	match armor:
+		&"plate": return "plate"
+		&"bone": return "bone"
+		&"hide": return "hide"
+	return "flesh"
 
 
 func interrupt_for_parry() -> void:
@@ -388,13 +501,20 @@ func _set_action(next: StringName, duration: float) -> void:
 		blocking = false
 
 
+## Actions need at least half their cost in stamina; the rest is taken from an empty bar, which
+## leaves the body exhausted (Souls games let any stamina above zero start an action).
 func _spend(cost: float) -> bool:
-	if stamina < cost:
+	if stamina < cost * 0.5 or (cost > 0.0 and stamina < 1.0):
 		_emit(&"tired")
 		return false
 	if cost > 0.0:
-		stamina -= cost
+		stamina = maxf(0.0, stamina - cost)
 		_stamina_wait = STAMINA_DELAY
+		if stamina < 1.0 and not exhausted:
+			# Running dry costs more than one short pause: regeneration stalls, then crawls.
+			exhausted = true
+			_stamina_wait = EXHAUSTED_DELAY
+			_emit(&"exhausted")
 	return true
 
 
@@ -475,15 +595,33 @@ func _strike() -> void:
 		if defender == null:
 			continue
 		var scale := power()
+		var bonus := _position_bonus(other)
 		if definition.backstab_multiplier > 1.0 and _is_behind(other):
 			scale *= definition.backstab_multiplier
 			_emit(&"critical", 1.0)
-		if not defender.receive_attack(self, definition, Vector3.ZERO, scale):
+		else:
+			scale *= bonus.x
+		if not defender.receive_attack(self, definition, Vector3.ZERO, scale, bonus.y):
 			continue
 		_contact_time = definition.hit_stop()
 		if attack != definition:
 			return
 		_hit_bodies.append(other.get_instance_id())
+
+
+## [damage, poise] multipliers for where the blow lands: the flank, the back, or the front.
+func _position_bonus(other: Node3D) -> Vector2:
+	var other_heading := other.get_node_or_null("Heading") as Node3D
+	if other_heading == null:
+		return Vector2.ONE
+	var to_attacker := body.global_position - other.global_position
+	to_attacker.y = 0.0
+	var facing := -other_heading.global_basis.z.dot(to_attacker.normalized())
+	if facing < -0.5:
+		return REAR_BONUS
+	if facing < 0.35:
+		return FLANK_BONUS
+	return Vector2.ONE
 
 
 func _is_behind(other: Node3D) -> bool:

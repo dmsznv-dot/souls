@@ -267,6 +267,8 @@ func on_world_impact(cue: StringName, location: Vector3, strength: float) -> voi
 		&"hit", &"death": base = lerpf(0.22, 0.6, strength)
 		&"block": base = lerpf(0.12, 0.32, strength)
 		&"guard_break": base = 0.55
+		&"knockdown": base = 0.5
+		&"posture_break": base = 0.35
 		&"shockwave": base = 0.6
 		&"nova": base = 0.4
 		&"skid": base = 0.06

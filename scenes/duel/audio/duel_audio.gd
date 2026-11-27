@@ -25,6 +25,13 @@ const POOLS := {
 	&"skid": ["skid"],
 	&"critical": ["critical"],
 	&"no_focus": ["no_focus"],
+	&"impact_plate": ["impact_plate_0", "impact_plate_1", "impact_plate_2"],
+	&"impact_bone": ["impact_bone_0", "impact_bone_1", "impact_bone_2"],
+	&"impact_flesh": ["impact_flesh_0", "impact_flesh_1", "impact_flesh_2"],
+	&"impact_hide": ["impact_hide_0", "impact_hide_1", "impact_hide_2"],
+	&"posture_break": ["posture_break"],
+	&"knockdown": ["knockdown"],
+	&"exhausted": ["exhausted"],
 }
 const STINGER_CUES: Array[StringName] = [&"victory", &"defeat"]
 const VOLUME_DB := -4.0
@@ -56,7 +63,11 @@ func play_cue(cue: StringName, at: Vector3, strength: float = 0.5) -> void:
 			pitch = lerpf(1.12, 0.86, strength)
 		&"hit", &"block":
 			pitch = lerpf(1.1, 0.84, strength)
-			gain = lerpf(-2.0, 1.5, strength)
+			gain = lerpf(-2.0, 1.5, strength) - (3.0 if cue == &"hit" else 0.0)
+		&"impact_plate", &"impact_bone", &"impact_flesh", &"impact_hide":
+			# The armour layer: heavier blows ring lower and louder.
+			pitch = lerpf(1.12, 0.8, clampf(strength, 0.0, 1.0))
+			gain = lerpf(-4.0, 2.0, clampf(strength, 0.0, 1.0))
 	var stream: AudioStream = _streams.get(cue)
 	if stream == null:
 		return

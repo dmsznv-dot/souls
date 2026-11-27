@@ -627,6 +627,66 @@ def special_sfx() -> None:
     write("sfx/no_focus", normalize(fade(fizzle), -10))
 
 
+def impact_sfx() -> None:
+    """Material layers played on top of the base hit, plus stun and knockdown cues."""
+    local = np.random.default_rng(4242)
+    for i in range(3):
+        # Plate: bright inharmonic ring and a scrape of grit.
+        length = int(0.7 * SR)
+        plate = np.zeros(length)
+        place(plate, clang(local.uniform(620, 980), 0.65, 1.1, 0.22), 0.0, 1.0)
+        place(plate, hp(noise(int(0.03 * SR)), 3000) * exp_decay(int(0.03 * SR), 0.006), 0.0, 0.9)
+        place(plate, bp(noise(int(0.15 * SR)), 2500, 7000) * exp_decay(int(0.15 * SR), 0.04), 0.01, 0.25)
+        write(f"sfx/impact_plate_{i}", normalize(fade(reverb(plate, 0.8, 0.12, 9000)), -4))
+        # Bone: dry splintering cracks over a hollow knock.
+        length = int(0.35 * SR)
+        bone = np.zeros(length)
+        place(bone, bone_clicks(0.25, 7 + i * 2, 0.06, 0.8), 0.0, 1.0)
+        knock = np.sin(2 * np.pi * local.uniform(380, 520) * t_axis(0.12)) * exp_decay(int(0.12 * SR), 0.02)
+        place(bone, knock, 0.0, 0.7)
+        place(bone, bp(noise(int(0.08 * SR)), 1800, 6000) * exp_decay(int(0.08 * SR), 0.012), 0.004, 0.6)
+        write(f"sfx/impact_bone_{i}", normalize(fade(bone), -4))
+        # Flesh and cloth: wet low thud, a short squelch.
+        length = int(0.4 * SR)
+        flesh = np.zeros(length)
+        place(flesh, thump(0.3, 95 - 8 * i, 38, 0.07), 0.0, 1.0)
+        squelch = lp(noise(int(0.12 * SR)), 900) * exp_decay(int(0.12 * SR), 0.035)
+        place(flesh, squelch, 0.006, 0.9)
+        place(flesh, bp(noise(int(0.05 * SR)), 300, 1200) * exp_decay(int(0.05 * SR), 0.015), 0.0, 0.5)
+        write(f"sfx/impact_flesh_{i}", normalize(fade(flesh), -4))
+        # Hide: dull leathery slap with a heavy body behind it.
+        length = int(0.45 * SR)
+        hide = np.zeros(length)
+        place(hide, thump(0.35, 70, 30, 0.1), 0.0, 1.0)
+        slap = bp(noise(int(0.05 * SR)), 500, 2200) * exp_decay(int(0.05 * SR), 0.01)
+        place(hide, slap, 0.0, 0.8)
+        write(f"sfx/impact_hide_{i}", normalize(fade(hide), -4))
+    # Posture broken: a ringing daze, a sinking tone and a jolt.
+    length = int(1.6 * SR)
+    daze = np.zeros(length)
+    place(daze, thump(0.5, 140, 45, 0.15), 0.0, 1.0)
+    ring = np.sin(2 * np.pi * 2900 * t_axis(1.5)) * exp_decay(int(1.5 * SR), 0.6) * 0.18
+    ring += np.sin(2 * np.pi * 3170 * t_axis(1.5)) * exp_decay(int(1.5 * SR), 0.5) * 0.12
+    place(daze, ring, 0.04, 1.0)
+    place(daze, clang(260, 1.2, 0.8, 0.5), 0.0, 0.5)
+    write("sfx/posture_break", normalize(fade(reverb(daze, 1.6, 0.25), 0.003, 0.3), -2))
+    # Knocked off one's feet: the body hits the flagstones and slides.
+    length = int(0.9 * SR)
+    fall = np.zeros(length)
+    place(fall, thump(0.5, 85, 28, 0.14), 0.0, 1.2)
+    place(fall, thump(0.3, 110, 40, 0.06), 0.12, 0.6)
+    place(fall, lp(noise(int(0.45 * SR)), 1500) * env_adsr(int(0.45 * SR), 0.02, 0.1, 0.5, 0.3), 0.08, 0.35)
+    place(fall, bone_clicks(0.4, 10, 0.3), 0.02, 0.45)
+    write("sfx/knockdown", normalize(fade(fall), -2.5))
+    # Out of breath: a ragged gasp, longer than the plain "tired" huff.
+    length = int(1.1 * SR)
+    gasp = np.zeros(length)
+    for k, at in enumerate([0.0, 0.42]):
+        g = int(0.5 * SR)
+        place(gasp, bp(noise(g), 350, 1600) * env_adsr(g, 0.06, 0.12, 0.5, 0.25), at, 1.0 - k * 0.3)
+    write("sfx/exhausted", normalize(fade(gasp), -10))
+
+
 # ---------------------------------------------------------------- music
 
 def court_music() -> None:
@@ -814,3 +874,4 @@ if __name__ == "__main__":
     ruins_combat()
     notice_stinger()
     weather_audio()
+    impact_sfx()

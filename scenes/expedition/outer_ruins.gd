@@ -111,6 +111,8 @@ func _play_feedback(cue: StringName, at: Vector3, strength: float = 0.5) -> void
 		&"parry": _set_notice("Parried  ·  Counter now")
 		&"guard_break": _set_notice("Guard broken")
 		&"tired": _set_notice("Out of stamina")
+		&"exhausted": _set_notice("Exhausted")
+		&"posture_break": _set_notice("Posture broken  ·  Strike now")
 		&"shockwave": RetroFX.shockwave(at, 3.0)
 		&"nova": RetroFX.shockwave(at, 2.8, Color(0.66, 0.58, 1.0))
 		&"critical": _set_notice("Critical")
