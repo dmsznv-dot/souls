@@ -22,6 +22,7 @@ RetroFX="*res://scenes/fx/retro_fx.gd"
 Music="*res://scenes/audio/music_director.gd"
 Perf="*res://scenes/debug/perf_monitor.gd"
 Director="*res://scenes/ai/combat_director.gd"
+Weather="*res://scenes/fx/weather.gd"
 
 [display]
 

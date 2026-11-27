@@ -28,6 +28,8 @@ func _ready() -> void:
 	_area.setup($Player, false)
 	remaining_enemies = _area.remaining
 	Music.play_area(&"ruins", 2.0)
+	Weather.set_preset(&"ruins")
+	Weather.bind_area(self)
 	RetroFX.prewarm.call_deferred(get_viewport().get_camera_3d())
 	Music.attach_torches(self)
 	_hero.defeated.connect(_finish.bind(&"defeat"))

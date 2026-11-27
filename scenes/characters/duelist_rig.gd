@@ -909,5 +909,11 @@ func _crossed(previous: float, current: float, mark: float, reverse: bool) -> bo
 	return mark > previous or mark <= current
 
 func _set_cape(pitch: float, bank: float) -> void:
+	var weather := get_node_or_null(^"/root/Weather")
+	if weather != null:
+		# Wind lifts the cape; gusts make it snap.
+		var side := global_basis.x.dot(weather.wind_direction)
+		pitch -= weather.wind * 14.0 + weather.gust * 10.0 * (0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.019))
+		bank += side * weather.wind * 12.0
 	skeleton.set_bone_pose_rotation(skeleton.find_bone("Cape"),
 			Basis.from_euler(Vector3(pitch,0,bank) * (PI/180)).get_rotation_quaternion())

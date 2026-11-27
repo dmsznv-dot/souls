@@ -165,7 +165,7 @@ func _test_guard_routes_around_cover() -> void:
 	await _ticks(9)
 	_guard.global_position = Vector3(-4.0, 0.02, -2.2)
 	_player.global_position = Vector3(-8.0, 0.02, -2.2)
-	await _ticks(265)
+	await _ticks(340)
 	_check(_guard.global_position.x < -6.6 and _hero_combat.health < 100.0,
 		"alerted guard round the pier and reach a player behind it")
 

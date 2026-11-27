@@ -109,6 +109,7 @@ func _spawn_ruins() -> void:
 	ruins.cleared.connect(_ruins_finish.bind(&"victory"))
 	ruins.enemy_defeated.connect(func(_enemy: Node) -> void: _show_notice("%d LEFT" % ruins.remaining, 1.2))
 	Music.attach_torches(ruins)
+	Weather.bind_area(self)
 
 
 func _track_zone() -> void:
@@ -128,6 +129,7 @@ func _track_zone() -> void:
 	if ruins != null:
 		ruins.set_backdrop_visible(in_ruins)
 	Music.play_area(&"ruins" if in_ruins else &"court", 3.0)
+	Weather.set_preset(&"ruins" if in_ruins else &"court")
 	$Interface/GuardMeters/Posture.visible = not in_ruins
 	if in_ruins:
 		if not _ruins_announced:

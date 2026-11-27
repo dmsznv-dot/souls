@@ -40,6 +40,8 @@ func _ready() -> void:
 	NoirLighting.apply($Environment, ACCENTS)
 	NoirLighting.toon(self)
 	Music.play_area(&"court", 1.5)
+	Weather.set_preset(&"court")
+	Weather.bind_area(self)
 	RetroFX.prewarm.call_deferred(get_viewport().get_camera_3d())
 	Music.attach_torches(self)
 	_focus = HudUtil.add_focus_bar(_stamina)

@@ -767,6 +767,42 @@ def ambience() -> None:
     write("ambience/torch", rms_normalize(fire, -24), True)
 
 
+def weather_audio() -> None:
+    """Rain bed with discrete drops, a wind gust swell, two thunder rolls. Loops crossfade."""
+    seconds = 12.0
+    length = int(seconds * SR)
+    extra = SR * 2
+    hiss = hp(noise(length + extra), 1800) * 0.25 + bp(noise(length + extra), 500, 1800) * 0.35
+    drops = np.zeros(length + extra)
+    for _ in range(2600):
+        drop_len = int(rng.uniform(0.004, 0.012) * SR)
+        drop = bp(noise(drop_len), rng.uniform(1500, 4000), 7000) * exp_decay(drop_len, 0.003)
+        place(drops, drop, rng.uniform(0, (length + extra) / SR - 0.02), rng.uniform(0.1, 0.6))
+    bed = np.stack([hiss + drops, np.roll(hiss, SR // 3) + np.roll(drops, SR // 5)], axis=1)
+    loop = bed[:length].copy()
+    ramp = np.linspace(0, 1, extra)[:, None]
+    loop[:extra] = bed[:extra] * ramp + bed[length:length + extra] * (1 - ramp)
+    write("ambience/rain", rms_normalize(loop, -24), True)
+    seconds = 8.0
+    length = int(seconds * SR)
+    t = np.linspace(0, 1, length)
+    swell = np.sin(np.pi * t) ** 1.5
+    raw = noise(length)
+    gust = (lp(raw, 500) * 0.8 + bp(raw, 500, 2000) * 0.5 * swell) * (0.25 + 0.75 * swell)
+    write("ambience/gust", rms_normalize(np.stack([gust, np.roll(gust, int(0.4 * SR))], axis=1), -24), True)
+    for k in range(2):
+        seconds = 6.0
+        length = int(seconds * SR)
+        roll = np.zeros(length)
+        place(roll, lp(noise(int(0.25 * SR)), 2500) * exp_decay(int(0.25 * SR), 0.05), 0.0, 0.7 if k == 0 else 0.3)
+        rumble = lp(noise(length), 140, 2) * exp_decay(length, 1.6 + k * 0.6)
+        crackle = np.zeros(length)
+        for _ in range(30):
+            place(crackle, thump(0.4, rng.uniform(60, 120), 30, 0.12), rng.uniform(0.05, 2.5), rng.uniform(0.1, 0.4))
+        roll += rumble * 3.0 + crackle
+        write(f"ambience/thunder_{k}", normalize(fade(reverb(roll, 3.0, 0.45, 2500), 0.002, 1.0), -2), True)
+
+
 if __name__ == "__main__":
     make_sfx()
     court_music()
@@ -777,3 +813,4 @@ if __name__ == "__main__":
     court_combat()
     ruins_combat()
     notice_stinger()
+    weather_audio()
