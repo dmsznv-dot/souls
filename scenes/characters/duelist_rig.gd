@@ -2,12 +2,22 @@ extends Node3D
 ## Original jointed court duelist. All action tracks use normalized one-second timelines.
 ## Combat owns the clock, including pauses, interruptions and recovery.
 @export var guard_variant := false
+@export_enum("Sword", "Spear", "Javelin", "SwordShield") var equipment: int = 0
+
+const MOTION: AnimationLibrary = preload("res://assets/animations/quaternius_humanoid.res")
+const POSES = preload("res://scenes/characters/duelist_poses.gd")
 
 @onready var skeleton: Skeleton3D = $Skeleton3D
 @onready var player: AnimationPlayer = $AnimationPlayer
 
 var gait_clock := 0.0
 var breath_clock := 0.0
+var stride := Vector2.ZERO
+var blend_start: Array[Quaternion] = []
+var blend_pelvis := Vector3.ZERO
+var blend_remaining := 0.0
+var blend_duration := 0.09
+var held_javelin: Array[MeshInstance3D] = []
 var last_clip: StringName = &""
 var cloth: StandardMaterial3D
 var trim: StandardMaterial3D
@@ -24,7 +34,7 @@ func _ready() -> void:
 	linen = _material("a08a72" if guard_variant else "9ab3ab")
 	blade = _material("d5ddd6", 0.45)
 	_dress()
-	player.add_animation_library(&"", preload("res://scenes/characters/duelist_poses.gd").create(skeleton))
+	player.add_animation_library(&"", POSES.create(skeleton))
 	apply_motion(&"locomotion", 0.0, Vector2.ZERO, 0.0)
 
 func _material(html: String, metal := 0.0) -> StandardMaterial3D:
@@ -122,6 +132,20 @@ func _dress() -> void:
 				Vector4(.092,.125,.036,0),Vector4(.162,.096,.031,0)],6,Vector3(0,0,-.145))
 		_loft("Head","Scarf",linen,[Vector4(-.043,.151,.149,-.013),
 				Vector4(.017,.149,.157,-.016),Vector4(.042,.140,.15,-.015)])
+	if equipment == 1 or equipment == 2:
+		var length := 1.05 if equipment == 1 else 0.78
+		held_javelin.append(_loft("HandR","AshShaft",leather,[Vector4(-.63,.024,.024,0),
+				Vector4(length,.022,.022,0)],8,Vector3(0,-.035,0),Vector3(-90,0,0)))
+		held_javelin.append(_loft("HandR","Socket",trim,[Vector4(length-.12,.035,.035,0),
+				Vector4(length+.02,.031,.031,0)],8,Vector3(0,-.035,0),Vector3(-90,0,0)))
+		held_javelin.append(_loft("HandR","LeafPoint",blade,[Vector4(length,.032,.018,0),
+				Vector4(length+.055,.07,.022,0), Vector4(length+.29,.001,.001,0)],4,
+				Vector3(0,-.035,0),Vector3(-90,0,0)))
+		return
+	if equipment == 3:
+		_loft("ElbowL","Shield",iron,[Vector4(-.45,.026,.034,0),Vector4(-.28,.185,.056,0),
+				Vector4(.085,.221,.063,0),Vector4(.155,.171,.055,0)],6,Vector3(-.065,-.065,-.09))
+		_box("ElbowL","ShieldSpine",Vector3(.035,.46,.025),trim,Vector3(-.065,-.17,-.15))
 	# Grip along local -Z. The sword's diamond cross section carries light on each face.
 	_box("HandR","Grip",Vector3(.036,.042,.19),leather,Vector3(0,-.035,-.013))
 	_box("HandR","Pommel",Vector3(.062,.064,.063),trim,Vector3(0,-.035,.104),Vector3(0,0,45))
@@ -131,45 +155,106 @@ func _dress() -> void:
 			Vector3(0,-.035,-.133),Vector3(-90,0,0))
 
 func apply_motion(clip: StringName, phase: float, local_motion: Vector2, delta: float) -> void:
-	if not is_node_ready() and skeleton == null:
+	if skeleton == null:
 		return
-	breath_clock = fmod(breath_clock + delta, TAU * 20.0)
-	if clip == &"locomotion" or not player.has_animation(clip):
-		if last_clip != &"locomotion":
-			player.stop()
-			skeleton.reset_bone_poses()
-		_locomote(local_motion, delta)
-		last_clip = &"locomotion"
-		return
+	phase = clampf(phase, 0.0, 1.0)
+	if clip != &"jump" and clip != &"locomotion" and not player.has_animation(clip):
+		clip = &"locomotion"
 	if clip != last_clip:
-		skeleton.reset_bone_poses()
-		player.play(clip)
+		blend_remaining = 0.0
+		if not last_clip.is_empty():
+			blend_duration = 0.11 if clip == &"locomotion" else 0.075
+			blend_remaining = blend_duration
+			blend_pelvis = skeleton.get_bone_pose_position(0)
+			blend_start.clear()
+			for i in skeleton.get_bone_count():
+				blend_start.append(skeleton.get_bone_pose_rotation(i))
+		player.stop()
+		if player.has_animation(clip):
+			player.play(clip)
 		last_clip = clip
-	player.seek(clampf(phase, 0.0, 1.0), true)
+	breath_clock = fposmod(breath_clock + delta / 3.4, 1.0)
+	match clip:
+		&"locomotion":
+			_locomote(local_motion,delta)
+		&"jump":
+			_jump(phase)
+		_:
+			player.seek(phase,true)
+	if equipment == 2:
+		for piece in held_javelin:
+			piece.visible = clip != &"enemy_throw" or phase < 0.44 or phase > 0.94
+	if blend_remaining > 0.0:
+		blend_remaining = maxf(0.0, blend_remaining - delta)
+		var weight := smoothstep(0,1,1.0 - blend_remaining / blend_duration)
+		skeleton.set_bone_pose_position(0,blend_pelvis.lerp(skeleton.get_bone_pose_position(0),weight))
+		for i in skeleton.get_bone_count():
+			skeleton.set_bone_pose_rotation(i,blend_start[i].slerp(skeleton.get_bone_pose_rotation(i),weight))
 
-func _rotate_bone(joint: String, angles: Vector3) -> void:
-	skeleton.set_bone_pose_rotation(skeleton.find_bone(joint),
-			Basis.from_euler(angles * (PI / 180.0)).get_rotation_quaternion())
+func _jump(phase: float) -> void:
+	# Overlap the three source clips so contact and flight meet without a pose cut.
+	var launch := MOTION.get_animation(&"jump_start")
+	var flight := MOTION.get_animation(&"jump_air")
+	var land := MOTION.get_animation(&"jump_land")
+	var a := launch if phase < .50 else flight
+	var b := flight if phase < .50 else land
+	var launch_t := clampf(phase/.25,0,1)
+	var flight_t := clampf((phase-.19)/.64,0,1)
+	var land_t := clampf((phase-.77)/.23,0,1)
+	var t_a := launch_t if phase < .50 else flight_t
+	var t_b := flight_t if phase < .50 else land_t
+	var blend := smoothstep(.19,.25,phase) if phase < .50 else smoothstep(.77,.83,phase)
+	skeleton.set_bone_pose_position(0,a.position_track_interpolate(0,t_a).lerp(
+			b.position_track_interpolate(0,t_b),blend))
+	for i in skeleton.get_bone_count():
+		skeleton.set_bone_pose_rotation(i,a.rotation_track_interpolate(i+1,t_a).slerp(
+				b.rotation_track_interpolate(i+1,t_b),blend))
+	_set_cape(-15.0 - 17.0 * sin(phase * PI), 0)
 
 func _locomote(motion: Vector2, delta: float) -> void:
-	var speed := minf(motion.length(), 1.0)
-	gait_clock = fmod(gait_clock + delta * lerpf(5.0, 10.0, speed), TAU)
-	var step := sin(gait_clock)
-	var breathe := sin(breath_clock * 2.7)
-	var pelvis := skeleton.find_bone("Pelvis")
-	var origin := skeleton.get_bone_rest(pelvis).origin
-	origin.y += breathe * .007 + speed * (.013 * cos(gait_clock * 2.0) - .026)
-	skeleton.set_bone_pose_position(pelvis, origin)
-	_rotate_bone("Chest",Vector3(-4.0 - speed * 4.0, -9.0 + step * speed * 7.0, motion.x * -4))
-	_rotate_bone("Cape",Vector3(-7.0 - speed * (10.0 + absf(step) * 8), 0, motion.x * 6))
-	_rotate_bone("Head", Vector3(4.0 + breathe, 5.0, 0))
-	for sign_value in [-1,1]:
-		var side := "L" if sign_value < 0 else "R"
-		var beat: float = step * sign_value
-		var lift := maxf(0, beat) * speed
-		_rotate_bone("Thigh"+side,Vector3(7 - beat * motion.y * 31 + lift * 10,
-				0, sign_value * 4 + beat * motion.x * 26))
-		_rotate_bone("Shin"+side,Vector3(-12 - lift * 29, 0, 0))
-		_rotate_bone("Foot"+side,Vector3(5 + beat * motion.y * 15 + lift * 12,0,0))
-		_rotate_bone("Arm"+side,Vector3(8 + beat * motion.y * 15,0,sign_value * 11))
-		_rotate_bone("Elbow"+side,Vector3(28 if sign_value > 0 else 19,0,0))
+	stride = stride.move_toward(motion.limit_length(),delta * 8.0)
+	var speed := stride.length()
+	var direction := stride.normalized()
+	var backward := -1.0 if direction.y > .35 else 1.0
+	gait_clock = fposmod(gait_clock + backward * delta * (0.46 + speed * 1.48) * smoothstep(0,.12,speed),1.0)
+	var walk := MOTION.get_animation(&"walk")
+	var run := MOTION.get_animation(&"run")
+	var idle := MOTION.get_animation(&"idle")
+	var run_weight := smoothstep(.40,.91,speed)
+	var moving := smoothstep(.01,.34,speed)
+	var pelvis := walk.position_track_interpolate(0,gait_clock).lerp(
+			run.position_track_interpolate(0,gait_clock),run_weight)
+	skeleton.set_bone_pose_position(0,idle.position_track_interpolate(0,breath_clock).lerp(pelvis,moving))
+	for i in skeleton.get_bone_count():
+		var track := i + 1
+		var gait := walk.rotation_track_interpolate(track,gait_clock).slerp(
+				run.rotation_track_interpolate(track,gait_clock),run_weight)
+		var still := idle.rotation_track_interpolate(track,breath_clock)
+		var name_string := String(skeleton.get_bone_name(i))
+		var pose := still.slerp(gait,moving)
+		if name_string.begins_with("Thigh") and absf(direction.x) > .01:
+			# Keep knees forward while the thigh carries each foot sideways across the ground.
+			var swing := pose.get_euler()
+			swing.z += swing.x * direction.x * moving * 0.88
+			swing.x *= lerpf(1.0,.27,direction.x*direction.x)
+			pose = Basis.from_euler(swing).get_rotation_quaternion()
+		elif name_string in ["ArmR","ElbowR","ArmL","ElbowL"]:
+			var stance: Vector3 = POSES.STANCE[name_string]
+			var ready := Basis.from_euler(stance * (PI/180)).get_rotation_quaternion()
+			var weapon_arm := name_string.ends_with("R") or equipment == 3
+			pose = ready.slerp(pose,(.25 if weapon_arm else .70) + speed * .23)
+		skeleton.set_bone_pose_rotation(i,pose)
+	# The supporting boot sets the standing height after the change in limb lengths.
+	var sole := INF
+	for foot in ["FootL","FootR"]:
+		var foot_pose := skeleton.get_bone_global_pose(skeleton.find_bone(foot))
+		for z in [-.16,.08]:
+			sole = minf(sole,(foot_pose * Vector3(0,-.076,z)).y)
+	var height := skeleton.get_bone_pose_position(0)
+	height.y -= clampf(sole,-.18,.18) * (1.0 - .40 * run_weight)
+	skeleton.set_bone_pose_position(0,height)
+	_set_cape(-7 - speed * (15 + 6*cos(gait_clock*TAU*2)), stride.x * 7)
+
+func _set_cape(pitch: float, bank: float) -> void:
+	skeleton.set_bone_pose_rotation(skeleton.find_bone("Cape"),
+			Basis.from_euler(Vector3(pitch,0,bank) * (PI/180)).get_rotation_quaternion())

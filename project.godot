@@ -11,8 +11,8 @@ config_version=5
 [application]
 
 config/name="souls"
-config/version="0.2.0"
-run/main_scene="res://scenes/duel/courtyard_duel.tscn"
+config/version="0.3.0"
+run/main_scene="res://scenes/expedition/boss_court.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
@@ -26,7 +26,7 @@ window/stretch/aspect="expand"
 [editor]
 
 version_control/plugin_name="GitPlugin"
-version_control/autoload_on_startup=true
+version_control/autoload_on_startup=false
 
 [input]
 
@@ -105,6 +105,14 @@ restart_duel={
 combat_debug={
 "deadzone": 0.5,
 "events": [Object(InputEventKey,"physical_keycode":4194333)]
+}
+jump={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":70), Object(InputEventJoypadButton,"device":-1,"button_index":2)]
+}
+interact={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":69), Object(InputEventJoypadButton,"device":-1,"button_index":0)]
 }
 
 [layer_names]

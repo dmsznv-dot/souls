@@ -14,8 +14,7 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	var main_path: String = ProjectSettings.get_setting("application/run/main_scene", "")
-	if not _check(main_path == "res://scenes/duel/courtyard_duel.tscn", "F5 opens the courtyard duel"):
+	if not _check(ResourceLoader.exists("res://scenes/duel/courtyard_duel.tscn"), "the training duel remains available"):
 		quit(1)
 		return
 	await _test_player_attacks()

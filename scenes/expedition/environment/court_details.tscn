@@ -1,0 +1,87 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/environment/graveyard-kit/iron-fence.glb" id="Fence"]
+[ext_resource type="PackedScene" path="res://assets/environment/graveyard-kit/gravestone-decorative.glb" id="Stela"]
+[ext_resource type="PackedScene" path="res://assets/environment/graveyard-kit/urn-round.glb" id="Vessel"]
+
+[node name="CourtDetails" type="Node3D"]
+
+[node name="WestCloisterRail0" parent="." instance=ExtResource("Fence")]
+position = Vector3(-9.63, 1.62, -7.65)
+scale = Vector3(1.96, 1.05, 1)
+rotation_degrees = Vector3(0, -90, 0)
+
+[node name="WestCloisterRail1" parent="." instance=ExtResource("Fence")]
+position = Vector3(-9.63, 1.62, -5.66)
+scale = Vector3(1.96, 1.05, 1)
+rotation_degrees = Vector3(0, -90, 0)
+
+[node name="WestCloisterRail2" parent="." instance=ExtResource("Fence")]
+position = Vector3(-9.63, 1.62, 2.45)
+scale = Vector3(1.96, 1.05, 1)
+rotation_degrees = Vector3(0, -90, 0)
+
+[node name="WestCloisterRail3" parent="." instance=ExtResource("Fence")]
+position = Vector3(-9.63, 1.62, 4.44)
+scale = Vector3(1.96, 1.05, 1)
+rotation_degrees = Vector3(0, -90, 0)
+
+[node name="WestWeatheredStela0" parent="." instance=ExtResource("Stela")]
+position = Vector3(-10.8, 0, -2.5)
+scale = Vector3(2.1, 2.5, 2.1)
+rotation_degrees = Vector3(0, 68, 0)
+
+[node name="WestWeatheredStela1" parent="." instance=ExtResource("Stela")]
+position = Vector3(-10.8, 0, -3.7)
+scale = Vector3(2.1, 2.5, 2.1)
+rotation_degrees = Vector3(0, 52, 0)
+
+[node name="WestWeatheredStela2" parent="." instance=ExtResource("Stela")]
+position = Vector3(-10.8, 0, 0.7)
+scale = Vector3(2.1, 2.5, 2.1)
+rotation_degrees = Vector3(0, 36, 0)
+
+[node name="WestGateUrn" parent="." instance=ExtResource("Vessel")]
+position = Vector3(-5.9, 0, -12.14)
+scale = Vector3(2.15, 2.5, 2.15)
+rotation_degrees = Vector3(0, 0, 0)
+
+[node name="EastCloisterRail0" parent="." instance=ExtResource("Fence")]
+position = Vector3(9.63, 1.62, -7.65)
+scale = Vector3(1.96, 1.05, 1)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="EastCloisterRail1" parent="." instance=ExtResource("Fence")]
+position = Vector3(9.63, 1.62, -5.66)
+scale = Vector3(1.96, 1.05, 1)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="EastCloisterRail2" parent="." instance=ExtResource("Fence")]
+position = Vector3(9.63, 1.62, 2.45)
+scale = Vector3(1.96, 1.05, 1)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="EastCloisterRail3" parent="." instance=ExtResource("Fence")]
+position = Vector3(9.63, 1.62, 4.44)
+scale = Vector3(1.96, 1.05, 1)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="EastWeatheredStela0" parent="." instance=ExtResource("Stela")]
+position = Vector3(10.8, 0, -2.5)
+scale = Vector3(2.1, 2.5, 2.1)
+rotation_degrees = Vector3(0, -68, 0)
+
+[node name="EastWeatheredStela1" parent="." instance=ExtResource("Stela")]
+position = Vector3(10.8, 0, -3.7)
+scale = Vector3(2.1, 2.5, 2.1)
+rotation_degrees = Vector3(0, -52, 0)
+
+[node name="EastWeatheredStela2" parent="." instance=ExtResource("Stela")]
+position = Vector3(10.8, 0, 0.7)
+scale = Vector3(2.1, 2.5, 2.1)
+rotation_degrees = Vector3(0, -36, 0)
+
+[node name="EastGateUrn" parent="." instance=ExtResource("Vessel")]
+position = Vector3(5.9, 0, -12.14)
+scale = Vector3(2.15, 2.5, 2.15)
+rotation_degrees = Vector3(0, 0, 0)

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scenes/duel/combat/attack_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+clip = &"enemy_throw"
+windup = 0.66
+active = 0.11
+recovery = 0.73
+damage = 17.0
+stamina_cost = 0.0
+block_cost = 16.0
+posture_damage = 20.0
+reach = 8.5
+arc = 32.0
+lunge_speed = 0.0
+projectile_speed = 13.0
