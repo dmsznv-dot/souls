@@ -6,11 +6,15 @@ Souls is an early-stage 3D soulslike prototype built in Godot 4.7.2 with GDScrip
 
 One test arena, one weapon, and one boss. The prototype will test lock-on camera behavior, dodge input buffering, stamina, and attack timing. The first boss will use distinct windups and punish windows so players can learn when to dodge, reposition, or counterattack.
 
-Souls 0.5 opens in the Ash Court against the Ash Gatekeeper. He reads your distance and his phase, never repeats a move back to back and mixes cuts, a three-blow string, a delayed overhead that punishes early rolls, a charging thrust after a backstep and a leaping slam with a landing shockwave; below half health he adds a full spin and a fan of ash bolts. Defeat him, approach the gate and press **E** or **A**: the seal burns away and a short bridge leads straight into the Outer Ruins. Nothing loads; the ruins stream in during the boss fight. Eight foes of six kinds hold the road to the shrine: the spearman, shieldbearer and cinder thrower, slow ash husks, a fast cinder crawler that pounces and backs off, a bone sentry, and the ashbound brute, whose slam shakes the ground. If you fall in the ruins, **T** or **Menu** raises you at their entrance with the foes restored, and the Gatekeeper stays defeated.
+Souls 0.6 opens in the Ash Court against the Ash Gatekeeper. He reads your distance and his phase, never repeats a move back to back and mixes cuts, a three-blow string, a delayed overhead that punishes early rolls, a charging thrust after a backstep and a leaping slam with a landing shockwave; below half health he adds a full spin and a fan of ash bolts. Defeat him, approach the gate and press **E** or **A**: the seal burns away and a short bridge leads straight into the Outer Ruins. Nothing loads; the ruins stream in during the boss fight. Eight foes of six kinds hold the road to the shrine: the spearman, shieldbearer and cinder thrower, slow ash husks, a fast cinder crawler that pounces and backs off, a bone sentry, and the ashbound brute, whose slam shakes the ground. If you fall in the ruins, **T** or **Menu** raises you at their entrance with the foes restored, and the Gatekeeper stays defeated.
 
 The hero is an armoured skeleton carrying six very different weapons. Hits come from the weapon itself: the striking edge is swept between physics steps and tested against each body, so a short blade misses where a greatsword connects. Movement has weight: rolls burst, carry and land in a crouch, a reversal at a run skids before pushing off, falls land hard, and foes accelerate, brake and turn at their own rates.
 
+Blows land with weight. Every body has poise: a light cut staggers a husk, a quick string or a heavy blow breaks a brute's, and heavy blows that break it knock the body off its feet (bosses stand firm). Breaking a foe's posture leaves it dazed for nearly two seconds, and the next blow is a critical. Hits from the flank and from behind deal more damage and poise for every weapon. Plate rings and throws sparks, bone cracks, flesh and hide thud with dark spatter. Actions need half their stamina cost; run the bar dry and regeneration stalls, then crawls until a third is back. Bosses and brutes stand winded for a moment after their strings and heavy swings: that is your window. Ordinary foes show a thin health bar over their heads once they fight or bleed; the large bar at the top belongs to bosses.
+
 Foes fight as a group: only a few attack at once while the rest circle at a distance, strafing and keeping clear of each other. They see in a cone (a quiet approach from behind goes unnoticed), hear a sprint, call nearby allies, track you through the early part of a windup, roll away from swings, punish openings, back off after taking hits and search where they last saw you before returning to their posts.
+
+The road through the ruins is dressed as a story: a caravan caught on the way to the shrine, a wrecked cart and the survivors' camp fire, caved-in paving and a fallen column, the last cart dragged aside and the brute's lair ringed with bones. Dressing comes from a reusable builder, `scenes/environment/set_dressing.gd`: an area lists entries such as `{"kind": "cart", "at": Vector3(5, 0, -3), "yaw": 15, "broken": true}` (kinds: cracks, sunken, rubble, fallen_column, collapsed_wall, cart, campfire, barrels, crates, bones), and `rebake_navigation` reroutes foes around whatever was placed. `scenes/expedition/environment/outer_ruins_dressing.gd` is the ruins' layout.
 
 The controller test arena and the shorter training duel are available in `scenes/arena/` and `scenes/duel/`. The ruins can also be played alone from `scenes/expedition/outer_ruins.tscn`.
 
@@ -26,6 +30,7 @@ The controller test arena and the shorter training duel are available in `scenes
 | Move | WASD | Left stick |
 | Look | Mouse | Right stick |
 | Lock or release target | Middle mouse button | R3 |
+| Switch locked target | Flick the mouse sideways | Flick the right stick |
 | Light attack | Left mouse button | RB |
 | Heavy attack | R | RT |
 | Block | Hold right mouse button | Hold LB |
@@ -47,18 +52,18 @@ Heavy attacks deal more posture damage. A frontal parry interrupts a melee attac
 | Ashen Tachi | 1.9 kg | Fast and long, slash | Heavy is a dashing draw cut |
 | Gatebreaker Greatsword | 9 kg | Slow, huge, slash | Hyper armour; hold heavy to charge up to +60 % |
 | Bone Shiv | 0.8 kg | Fastest, short, pierce | Three-cut flurry, lunging pounce, x2.5 to the back |
-| Bellbreaker | 11 kg | Slowest, impact | Crushes guards; heavy slams a shockwave |
+| Bellbreaker | 11 kg | Slowest, impact, a head as broad as the chest | Crushes guards; heavy slams a shockwave |
 | Ember Staff | 2 kg | Magic | Spends focus on homing ember bolts and an ash nova; bonks without focus |
 
 Foes take more or less damage from slash, pierce, impact and magic depending on their armour. Hold the heavy button to charge weapons that allow it; the blue bar is focus and refills slowly.
 
-Weapons live in `scenes/combat/weapons/` as `SoulsWeapon` resources: blade length, grip, mass and the light chain and heavy attack. Attack resources expose timing, damage, posture, AI engagement distance, impact weight and the chain and roll-cancel points in the Inspector. Sword arms follow authored blade paths (`SWINGS` in `scenes/characters/duelist_rig.gd`) through two-bone IK, so the edge crosses the space in front of the body while hits can land.
+Out of a fight the greatsword and the maul rest on the shoulder; locking on, guarding or attacking brings them into the two-handed stance. Weapons live in `scenes/combat/weapons/` as `SoulsWeapon` resources: blade length, grip, mass and the light chain and heavy attack. Attack resources expose timing, damage, posture, AI engagement distance, impact weight and the chain and roll-cancel points in the Inspector. Sword arms follow authored blade paths (`SWINGS` in `scenes/characters/duelist_rig.gd`) through two-bone IK, so the edge crosses the space in front of the body while hits can land.
 
 ### Look and sound
 
 `scenes/fx/` holds the presentation: a post-process that resamples the frame on a coarse pixel grid, posterizes it through a 4x4 Bayer dither and adds animated grain, then grades it as comic neon noir after The Wolf Among Us, with ink lines on sharp edges, darks crushed toward blue-black and warmed highlights. A cold blue moon throws hard shadows, lanterns make flickering warm pools, magenta neon rims silhouettes against a magenta horizon, and lit materials use toon shading. Gradients in the fog and sky break into dithered bands.
 
-Weather is one shared model: gusting wind drives leaves, ash, the hero's cape and the occasional tumbling branch; rain falls slanted by the wind, wets the stone until lanterns glint off it, and storms bring lightning and thunder. The court is windy with passing drizzle, the ruins are stormy.
+The hero's mantle is simulated cloth: it trails through runs and turns, swings with rolls, and settles over the stones when the body falls. Weather is one shared model: gusting wind drives leaves, ash, the mantle and the occasional tumbling branch; rain falls slanted by the wind, wets the stone until lanterns glint off it, and storms bring lightning and thunder. The court is windy with passing drizzle, the ruins are stormy.
 
 Every sound and music stem is synthesized by `tools/audio/generate_audio.py`. The Ash Court explores to a D minor dungeon synth score and the Outer Ruins to a D Dorian medieval tune on drone, lute and recorder. When a foe notices you a stinger hits and the area's own combat theme starts: the Gatekeeper's D minor theme gains a choir in his second phase, and the ruins fight is a driving dungeon synth arrangement. Scores crossfade when you cross the bridge. To regenerate the audio:
 
@@ -78,6 +83,8 @@ godot --headless --path . --script res://tests/foes.gd
 godot --headless --path . --script res://tests/music.gd
 godot --headless --path . --script res://tests/ai.gd
 godot --headless --path . --script res://tests/weather.gd
+godot --headless --path . --script res://tests/poise.gd
+godot --headless --path . --script res://tests/dressing.gd
 ```
 
 The courtyard, duelist and skeleton meshes, weapons, sounds and music were created for this project. [Motion sources](docs/motion-sources.md) describes the retargeted Quaternius clips. [Third-party assets](THIRD_PARTY.md) lists the Kenney models and their license. Development skills and their license are in `.agents/skills/`.
