@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 RetroFX="*res://scenes/fx/retro_fx.gd"
+Music="*res://scenes/audio/music_director.gd"
 
 [display]
 

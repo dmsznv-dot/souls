@@ -89,6 +89,8 @@ var _blade_base: Marker3D
 var _blade_tip: Marker3D
 var _trail: MeshInstance3D
 var _jaw: Node3D
+var _steps: AudioStreamPlayer3D
+const STEP_TAKES := ["step_0", "step_1", "step_2", "step_3", "step_4"]
 
 func _ready() -> void:
 	cloth = _material("875339" if guard_variant else "276258")
@@ -107,6 +109,20 @@ func _ready() -> void:
 		_dress_skeleton()
 	else:
 		_dress()
+	_steps = AudioStreamPlayer3D.new()
+	_steps.name = "Steps"
+	var takes := AudioStreamRandomizer.new()
+	for take: String in STEP_TAKES:
+		takes.add_stream(-1, load("res://assets/audio/sfx/%s.wav" % take))
+	takes.random_pitch = 1.08
+	takes.random_volume_offset_db = 2.0
+	_steps.stream = takes
+	_steps.bus = &"SFX"
+	_steps.volume_db = -9.0
+	_steps.unit_size = 4.0
+	_steps.max_distance = 22.0
+	_steps.max_polyphony = 3
+	add_child(_steps)
 	_trail = WeaponTrail.new()
 	_trail.name = "BladeTrail"
 	add_child(_trail)
@@ -542,12 +558,19 @@ func _locomote(motion: Vector2, delta: float) -> void:
 	var speed := stride.length()
 	var direction := stride.normalized()
 	var backward := -1.0 if direction.y > .35 else 1.0
+	var previous_clock := gait_clock
 	gait_clock = fposmod(gait_clock + backward * delta * (0.46 + speed * 1.48) * smoothstep(0,.12,speed),1.0)
 	var walk := MOTION.get_animation(&"walk")
 	var run := MOTION.get_animation(&"run")
 	var idle := MOTION.get_animation(&"idle")
 	var run_weight := smoothstep(.40,.91,speed)
 	var moving := smoothstep(.01,.34,speed)
+	if speed > 0.18 and _steps != null:
+		# Heel strikes measured on the source clips: walk 0.20 / 0.60, run 0.03 / 0.55.
+		for contact in [lerpf(.20, .025, run_weight), lerpf(.60, .55, run_weight)]:
+			if _crossed(previous_clock, gait_clock, contact, backward < 0.0):
+				_steps.volume_db = -11.0 + speed * 4.0
+				_steps.play()
 	var pelvis := walk.position_track_interpolate(0,gait_clock).lerp(
 			run.position_track_interpolate(0,gait_clock),run_weight)
 	skeleton.set_bone_pose_position(0,idle.position_track_interpolate(0,breath_clock).lerp(pelvis,moving))
@@ -580,6 +603,15 @@ func _locomote(motion: Vector2, delta: float) -> void:
 	height.y -= clampf(sole,-.18,.18) * (1.0 - .40 * run_weight)
 	skeleton.set_bone_pose_position(0,height)
 	_set_cape(-7 - speed * (15 + 6*cos(gait_clock*TAU*2)), stride.x * 7)
+
+func _crossed(previous: float, current: float, mark: float, reverse: bool) -> bool:
+	if reverse:
+		var swap := previous
+		previous = current
+		current = swap
+	if previous <= current:
+		return previous < mark and mark <= current
+	return mark > previous or mark <= current
 
 func _set_cape(pitch: float, bank: float) -> void:
 	skeleton.set_bone_pose_rotation(skeleton.find_bone("Cape"),

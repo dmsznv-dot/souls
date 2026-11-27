@@ -37,6 +37,10 @@ func _ready() -> void:
 		$LockPoint.position.y = 1.57
 
 
+func is_engaged() -> bool:
+	return ai_enabled and _alerted and _combat.health > 0.0
+
+
 func _physics_process(delta: float) -> void:
 	var previous := _combat.action
 	_combat.blocking = role == &"shield" and previous == &"" and _combat.stamina > 0.0

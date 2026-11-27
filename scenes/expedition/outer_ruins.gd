@@ -27,6 +27,8 @@ var _retry_pending: bool
 
 func _ready() -> void:
 	remaining_enemies = _enemies.size()
+	Music.play_area(&"ruins", 2.0)
+	Music.attach_torches(self)
 	_hero.defeated.connect(_finish.bind(&"defeat"))
 	_hero.feedback.connect(_play_feedback)
 	_hero.weapon_changed.connect(func(weapon: SoulsWeapon) -> void: _set_notice(weapon.display_name))
@@ -38,6 +40,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	var engaged := outcome == &"" and _enemies.any(func(enemy: Node) -> bool: return enemy.is_engaged())
+	Music.set_intensity(2 if engaged else (0 if outcome == &"defeat" else 1))
 	_vitality.value = _hero.health
 	_stamina.value = _hero.stamina
 	_notice_time = maxf(0.0, _notice_time - delta)
