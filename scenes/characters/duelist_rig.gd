@@ -15,6 +15,7 @@ const MOTION: AnimationLibrary = preload("res://assets/animations/quaternius_hum
 const EXTRA: AnimationLibrary = preload("res://assets/animations/quaternius_extra.res")
 enum { HUMAN, ZOMBIE, GHOUL, BRUTE }
 ## Portion of a source clip mapped onto an action's 0..1 timeline.
+const ClothCape = preload("res://scenes/characters/cloth_cape.gd")
 const CLIP_WINDOWS := {
 	&"mocap_roll": Vector2(0.0, 0.72), &"death": Vector2(0.0, 1.0), &"hit_knockback": Vector2(0.0, 1.0), &"hit_chest": Vector2(0.0, 1.0),
 	&"zombie_scratch": Vector2(0.08, 0.86), &"melee_hook": Vector2(0.0, 1.0), &"punch_cross": Vector2(0.05, 0.9),
@@ -315,12 +316,12 @@ func _dress_skeleton() -> void:
 			Vector4(.26,.16,.12,0)],8)
 	_loft("Chest","Gorget",rusted,[Vector4(.26,.15,.12,0),Vector4(.32,.11,.1,0)],8)
 	_box("Chest","Strap",Vector3(.05,.4,.025),leather,Vector3(.02,.1,-.13),Vector3(0,0,-38))
-	# Torn mantle in uneven strips.
-	var lengths := [.62, .48, .7, .55, .44]
-	for i in lengths.size():
-		var x := -.2 + i * .1
-		_box("Cape","MantleStrip%d" % i,Vector3(.11,lengths[i],.018),cloth,
-				Vector3(x,-lengths[i] * .5 + .04,.16 + absf(x) * .1),Vector3(4,0,x * 12))
+	# Torn mantle: simulated cloth hanging from the shoulders.
+	var mantle := ClothCape.new()
+	mantle.name = "ClothCape"
+	mantle.rig_skeleton = skeleton
+	mantle.material_override = _double_sided(cloth)
+	add_child(mantle)
 	_loft("Cape","MantleCollar",cloth,[Vector4(-.02,.2,.07,.07),Vector4(.04,.15,.06,.05)],8)
 	for side in [-1, 1]:
 		var s := "L" if side < 0 else "R"
