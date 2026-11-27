@@ -10,6 +10,8 @@ Souls 0.5 opens in the Ash Court against the Ash Gatekeeper. He reads your dista
 
 The hero is an armoured skeleton carrying six very different weapons. Hits come from the weapon itself: the striking edge is swept between physics steps and tested against each body, so a short blade misses where a greatsword connects. Movement has weight: rolls burst, carry and land in a crouch, a reversal at a run skids before pushing off, falls land hard, and foes accelerate, brake and turn at their own rates.
 
+Foes fight as a group: only a few attack at once while the rest circle at a distance, strafing and keeping clear of each other. They see in a cone (a quiet approach from behind goes unnoticed), hear a sprint, call nearby allies, track you through the early part of a windup, roll away from swings, punish openings, back off after taking hits and search where they last saw you before returning to their posts.
+
 The controller test arena and the shorter training duel are available in `scenes/arena/` and `scenes/duel/`. The ruins can also be played alone from `scenes/expedition/outer_ruins.tscn`.
 
 ## Run locally
@@ -35,7 +37,7 @@ The controller test arena and the shorter training duel are available in `scenes
 | Open the seal gate | E | A |
 | Retry current area | T | Menu |
 
-Press **Esc** to release the mouse cursor. Left-click the game window to capture it again. **F3** toggles the retro presentation.
+Press **Esc** to release the mouse cursor. Left-click the game window to capture it again. **F3** toggles the retro presentation. **F4** shows frame timing; any hitch is also written with the gameplay events of that frame to `user://hitches.log` (on macOS: `~/Library/Application Support/Godot/app_userdata/souls/hitches.log`). Physics interpolation is on, so movement stays smooth on 120 Hz displays.
 
 Heavy attacks deal more posture damage. A frontal parry interrupts a melee attack and makes the first follow-up strike hit harder. The shieldbearer opens up during an attack. Cover can intercept the thrower's visible bolts. Press **F2** in the Ash Court to inspect attack arcs, phases, and queued input.
 
@@ -54,7 +56,9 @@ Weapons live in `scenes/combat/weapons/` as `SoulsWeapon` resources: blade lengt
 
 ### Look and sound
 
-`scenes/fx/` holds the presentation: a post-process that resamples the frame on a coarse pixel grid, posterizes it through a 4x4 Bayer dither and adds animated grain, and a shared dense dusk fog for both areas. Gradients in the fog and sky break into dithered bands.
+`scenes/fx/` holds the presentation: a post-process that resamples the frame on a coarse pixel grid, posterizes it through a 4x4 Bayer dither and adds animated grain, then grades it as comic neon noir after The Wolf Among Us, with ink lines on sharp edges, darks crushed toward blue-black and warmed highlights. A cold blue moon throws hard shadows, lanterns make flickering warm pools, magenta neon rims silhouettes against a magenta horizon, and lit materials use toon shading. Gradients in the fog and sky break into dithered bands.
+
+Weather is one shared model: gusting wind drives leaves, ash, the hero's cape and the occasional tumbling branch; rain falls slanted by the wind, wets the stone until lanterns glint off it, and storms bring lightning and thunder. The court is windy with passing drizzle, the ruins are stormy.
 
 Every sound and music stem is synthesized by `tools/audio/generate_audio.py`. The Ash Court explores to a D minor dungeon synth score and the Outer Ruins to a D Dorian medieval tune on drone, lute and recorder. When a foe notices you a stinger hits and the area's own combat theme starts: the Gatekeeper's D minor theme gains a choir in his second phase, and the ruins fight is a driving dungeon synth arrangement. Scores crossfade when you cross the bridge. To regenerate the audio:
 
@@ -72,6 +76,8 @@ godot --headless --path . --script res://tests/expedition.gd
 godot --headless --path . --script res://tests/weapons.gd
 godot --headless --path . --script res://tests/foes.gd
 godot --headless --path . --script res://tests/music.gd
+godot --headless --path . --script res://tests/ai.gd
+godot --headless --path . --script res://tests/weather.gd
 ```
 
 The courtyard, duelist and skeleton meshes, weapons, sounds and music were created for this project. [Motion sources](docs/motion-sources.md) describes the retargeted Quaternius clips. [Third-party assets](THIRD_PARTY.md) lists the Kenney models and their license. Development skills and their license are in `.agents/skills/`.
