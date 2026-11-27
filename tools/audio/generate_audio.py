@@ -435,6 +435,198 @@ def _drone(notes: list[int], seconds: float, buzz_beats: list[float] | None) -> 
     return out
 
 
+def tape(x: np.ndarray, depth: float = 0.004, rate: float = 0.31) -> np.ndarray:
+    """Cassette wow and soft saturation: a slow wandering pitch and rounded peaks."""
+    length = len(x)
+    seconds = length / SR
+    t = np.arange(length) / SR
+    # Whole cycles per loop so the warp, like the music, ends where it began.
+    slow = max(1, round(rate * seconds)) / seconds
+    fast = max(2, round(rate * 2.7 * seconds)) / seconds
+    wander = depth * SR * (np.sin(2 * np.pi * slow * t) + 0.35 * np.sin(2 * np.pi * fast * t + 1.3))
+    index = np.arange(length) + wander
+    channels = [x] if x.ndim == 1 else [x[:, c] for c in range(x.shape[1])]
+    warped = [np.interp(index, np.arange(length), ch, period=length) for ch in channels]
+    y = warped[0] if x.ndim == 1 else np.stack(warped, axis=1)
+    peak = np.max(np.abs(y)) + 1e-9
+    return np.tanh(y / peak * 1.4) * peak / np.tanh(1.4)
+
+
+def harpsichord(note: int, seconds: float) -> np.ndarray:
+    pluck = karplus(midi(note), seconds, 0.992, 0.95) + karplus(midi(note) * 2.003, seconds, 0.985, 1.0) * 0.3
+    return fade(hp(pluck, 180), 0.001, 0.05)
+
+
+def brass(note: int, seconds: float, bright: float = 1.0) -> np.ndarray:
+    """Synth brass: stacked saws through a lowpass that opens on the attack."""
+    f = midi(note)
+    t = t_axis(seconds)
+    raw = sum(saw(f * 2 ** (c / 1200), seconds, rng.uniform()) for c in (-7, 0, 6)) / 3
+    sweep = 500 + 2600 * bright * np.exp(-t / 0.18) + 900 * bright
+    out = np.zeros(len(t))
+    block = 1024
+    for start in range(0, len(t), block):
+        cutoff = float(sweep[min(start + block // 2, len(t) - 1)])
+        out[start:start + block] = lp(raw[max(0, start - 2048):start + block], cutoff)[-len(raw[start:start + block]):]
+    return out * env_adsr(len(t), 0.03, 0.15, 0.75, 0.12)
+
+
+def war_snare(seconds: float = 0.3) -> np.ndarray:
+    length = int(seconds * SR)
+    return bp(noise(length), 900, 5000) * exp_decay(length, 0.06) + \
+        np.sin(2 * np.pi * 190 * t_axis(seconds)) * exp_decay(length, 0.04) * 0.5
+
+
+def arp_pluck(note: int, seconds: float) -> np.ndarray:
+    f = midi(note)
+    raw = saw(f, seconds) + 0.5 * saw(f * 1.004, seconds)
+    t = t_axis(seconds)
+    return lp(raw, 2400) * np.exp(-t / 0.09)
+
+
+def court_combat() -> None:
+    """The Gatekeeper's theme: D minor with Phrygian E flat, a 16th-note ostinato, timpani and
+    war snare under a synth-brass melody; phase two adds a chanting choir and bells."""
+    bpm, bars = 126, 16
+    beat = 60 / bpm
+    length_s = bars * 4 * beat
+    length = int(length_s * SR)
+    harmony = ["Dm", "Dm", "Eb", "Eb", "Dm", "C", "Bb", "Eb", "Dm", "Dm", "Gm", "Gm", "Eb", "Eb", "A", "A"]
+    chords = {"Dm": ["D3", "F3", "A3"], "Eb": ["Eb3", "G3", "Bb3"], "C": ["C3", "E3", "G3"],
+              "Bb": ["Bb2", "D3", "F3"], "Gm": ["G2", "Bb2", "D3"], "A": ["A2", "C#3", "E3"]}
+    rhythm = np.zeros(length)
+    extra = np.zeros(length)
+    for bar, chord in enumerate(harmony):
+        at = bar * 4 * beat
+        root = n(chords[chord][0]) - 12
+        for k in range(16):
+            step = [0, 0, 0, 1, 0, 0, -2, 0][k % 8]
+            note = root + {1: 1, -2: -2}.get(step, 0)
+            place_wrapped(rhythm, arp_pluck(note, beat * 0.3), at + k * beat / 4, 0.32 if k % 4 == 0 else 0.2)
+        place_wrapped(rhythm, timpani(root + 12, 1.2), at, 0.9)
+        place_wrapped(rhythm, timpani(root + 12, 0.8), at + 2 * beat, 0.6)
+        for hit in (1, 3):
+            place_wrapped(rhythm, war_snare(), at + hit * beat, 0.45)
+        place_wrapped(rhythm, war_snare(0.15), at + 3.75 * beat, 0.2)
+        if bar % 2 == 0:
+            for v in chords[chord]:
+                place_wrapped(rhythm, pad_voice(n(v), 8 * beat + 0.6, 1500, 10), at, 0.12)
+                place_wrapped(extra, choir_voice(n(v) + 12, 8 * beat + 0.8), at, 0.2)
+            place_wrapped(extra, clang(midi(root + 24), 2.5, 0.6, 1.2), at, 0.25)
+    tune = [("A4", 2), ("D5", 1), ("F5", 1), ("E5", 1.5), ("D5", .5), ("C5", 1), ("D5", 1),
+            ("Eb5", 2), ("G5", 1), ("Bb5", 1), ("G5", 1), ("F5", 1), ("Eb5", 1), ("D5", 1),
+            ("D5", 2), ("A4", 1), ("D5", 1), ("E5", 1.5), ("D5", .5), ("C5", 2),
+            ("D5", 2), ("F5", 1), ("Bb5", 1), ("G5", 2), ("F5", 1), ("Eb5", 1),
+            ("A5", 2), ("G5", .5), ("F5", .5), ("E5", 1), ("F5", 1), ("E5", 1), ("D5", 2),
+            ("G5", 1.5), ("A5", .5), ("Bb5", 1), ("A5", 1), ("G5", 2), ("D5", 2),
+            ("Eb5", 1), ("F5", 1), ("G5", 1), ("Bb5", 1), ("Bb5", 2), ("G5", 2),
+            ("C#5", 1), ("E5", 1), ("A5", 1), ("G5", 1), ("F5", 1), ("E5", 1), ("D5", 1), ("C#5", 1)]
+    lead = np.zeros(length)
+    at = 0.0
+    for name, beats in tune:
+        place_wrapped(lead, brass(n(name) - 12, beats * beat * 0.92), at, 0.36)
+        at += beats * beat
+    assert abs(at - length_s) < 1e-6, (at, length_s)
+    write("music/court_combat_rhythm", rms_normalize(loop_reverb(rhythm, seconds=1.8, wet=0.25, tone=4000), -20), True)
+    write("music/court_combat_lead", rms_normalize(tape(loop_reverb(lead, seconds=2.4, wet=0.35, tone=5000), 0.0015), -22), True)
+    write("music/court_combat_phase", rms_normalize(loop_reverb(extra, seconds=3.5, wet=0.5, tone=4000), -23), True)
+
+
+def ruins_combat() -> None:
+    """Ruins fight: D Dorian dungeon synth at 132 BPM, a 16th-note arpeggiator, frame drum and
+    taiko under a buzzing hurdy-gurdy, and a new organ melody; a choir layer for the brute."""
+    bpm, bars = 132, 16
+    beat = 60 / bpm
+    length_s = bars * 4 * beat
+    length = int(length_s * SR)
+    harmony = ["Dm", "Dm", "C", "C", "Dm", "Dm", "G", "G", "F", "F", "C", "C", "Am", "Am", "Dm", "Dm"]
+    shapes = {"Dm": ["D3", "F3", "A3", "D4"], "C": ["C3", "E3", "G3", "C4"], "G": ["G2", "B2", "D3", "G3"],
+              "F": ["F2", "A2", "C3", "F3"], "Am": ["A2", "C3", "E3", "A3"]}
+    rhythm = np.zeros(length)
+    extra = np.zeros(length)
+    buzz = []
+    for bar, chord in enumerate(harmony):
+        at = bar * 4 * beat
+        tones = [n(v) + 12 for v in shapes[chord]]
+        for k in range(16):
+            place_wrapped(rhythm, arp_pluck(tones[[0, 1, 2, 3, 2, 1, 2, 3][k % 8]], beat * 0.28), at + k * beat / 4, 0.17)
+        place_wrapped(rhythm, timpani(n(shapes[chord][0]) - 12, 0.9), at, 0.8)
+        for hit, low in ((0, True), (1.5, True), (2, False), (3, False), (3.5, False)):
+            place_wrapped(rhythm, frame_drum(low), at + hit * beat, 0.7 if low else 0.45)
+        for e in range(8):
+            place_wrapped(rhythm, jingle(), at + e * beat / 2 + beat / 4, 0.25)
+        buzz += [at + b * beat for b in range(4)]
+        if bar % 2 == 0:
+            for v in shapes[chord][1:]:
+                place_wrapped(extra, choir_voice(n(v) + 12, 8 * beat + 0.6), at, 0.2)
+    rhythm += hurdy_drone([n("D2"), n("A2")], length_s, buzz) * 0.2
+    tune = [("D5", .5), ("F5", .5), ("A5", 1), ("G5", .5), ("F5", .5), ("E5", 1), ("D5", 1.5), ("E5", .5), ("F5", 2),
+            ("E5", .5), ("G5", .5), ("C6", 1), ("B5", .5), ("A5", .5), ("G5", 1), ("E5", 2), ("G5", 2),
+            ("A5", 1), ("G5", .5), ("F5", .5), ("E5", 1), ("D5", 1), ("F5", 1), ("E5", 1), ("D5", 2),
+            ("B4", 1), ("D5", 1), ("G5", 1), ("B5", 1), ("A5", 2), ("G5", 2),
+            ("A5", 1), ("C6", 1), ("A5", 1), ("F5", 1), ("G5", 1.5), ("F5", .5), ("E5", 2),
+            ("G5", 1), ("E5", 1), ("C5", 1), ("E5", 1), ("D5", 2), ("E5", 2),
+            ("C5", 1), ("E5", 1), ("A5", 1), ("G5", 1), ("F5", 1), ("E5", 1), ("D5", 1), ("C5", 1),
+            ("D5", 1), ("F5", 1), ("A5", 1), ("F5", 1), ("D5", 4)]
+    lead = np.zeros(length)
+    at = 0.0
+    for name, beats in tune:
+        place_wrapped(lead, organ_lead(n(name), beats * beat * 0.9 + 0.1), at, 0.3)
+        place_wrapped(lead, brass(n(name) - 12, beats * beat * 0.9, 0.6), at, 0.14)
+        at += beats * beat
+    assert abs(at - length_s) < 1e-6, (at, length_s)
+    write("music/ruins_combat_rhythm", rms_normalize(loop_reverb(rhythm, seconds=1.6, wet=0.22, tone=5000), -20), True)
+    write("music/ruins_combat_lead", rms_normalize(tape(loop_reverb(lead, seconds=2.2, wet=0.35, tone=5500), 0.0015), -22), True)
+    write("music/ruins_combat_phase", rms_normalize(loop_reverb(extra, seconds=3.0, wet=0.5, tone=4000), -23), True)
+
+
+def notice_stinger() -> None:
+    """A foe has seen you: low boom, a dissonant brass cluster swelling open, a choir breath."""
+    seconds = 2.2
+    out = np.zeros(int(seconds * SR))
+    place(out, thump(1.6, 70, 30, 0.45), 0.0, 1.0)
+    for note in ("D3", "Eb3", "A3", "D4"):
+        place(out, brass(n(note), 1.6, 1.3), 0.02, 0.22)
+    for note in ("D4", "Eb4", "A4"):
+        place(out, choir_voice(n(note), 1.8), 0.05, 0.12)
+    place(out, hp(noise(int(0.5 * SR)), 3000) * np.linspace(0, 1, int(0.5 * SR)) ** 2 * 0.1, 0.0, 1.0)
+    write("music/notice", normalize(fade(reverb(out, 2.8, 0.4, 4000), 0.002, 0.5), -3), True)
+
+
+def special_sfx() -> None:
+    length = int(0.7 * SR)
+    cast = whoosh(0.7, 1500, 9000, 0.25) * 0.6
+    for k in range(5):
+        place(cast, clang(rng.uniform(1600, 3200), 0.6, 0.5, 0.25) * 0.2, 0.02 + k * 0.03)
+    write("sfx/cast", normalize(fade(reverb(cast, 1.4, 0.35, 8000)), -4))
+    nova = np.zeros(int(1.6 * SR))
+    place(nova, thump(1.2, 90, 28, 0.35), 0.0, 1.0)
+    place(nova, whoosh(1.2, 400, 8000, 0.08) * 0.6, 0.0)
+    for k in range(8):
+        place(nova, clang(rng.uniform(900, 2600), 0.9, 0.5, 0.4) * 0.15, rng.uniform(0, 0.2))
+    write("sfx/nova", normalize(fade(reverb(nova, 2.2, 0.4, 6000)), -2))
+    slam = np.zeros(int(1.4 * SR))
+    place(slam, thump(1.0, 75, 24, 0.3), 0.0, 1.3)
+    place(slam, lp(noise(int(0.6 * SR)), 700) * exp_decay(int(0.6 * SR), 0.15), 0.0, 0.9)
+    for k in range(10):
+        place(slam, thump(0.12, rng.uniform(180, 320), 90, 0.02), rng.uniform(0.04, 0.5), rng.uniform(0.15, 0.35))
+    write("sfx/shockwave", normalize(fade(reverb(slam, 1.6, 0.25, 3000)), -1.5))
+    charged = np.zeros(int(0.8 * SR))
+    place(charged, clang(midi(n("A5")), 0.8, 0.8, 0.5), 0.0, 0.6)
+    place(charged, whoosh(0.4, 2000, 9000, 0.9) * 0.3, 0.0)
+    write("sfx/charged", normalize(fade(charged), -6))
+    skid = lp(noise(int(0.45 * SR)), 2600) * env_adsr(int(0.45 * SR), 0.01, 0.1, 0.6, 0.25)
+    skid = skid + bp(noise(len(skid)), 300, 900) * 0.5 * np.linspace(1, 0, len(skid))
+    write("sfx/skid", normalize(fade(skid), -8))
+    crit = np.zeros(int(0.9 * SR))
+    place(crit, hp(noise(int(0.06 * SR)), 4000) * exp_decay(int(0.06 * SR), 0.01), 0.0, 0.8)
+    place(crit, thump(0.4, 160, 50, 0.1), 0.0, 1.0)
+    place(crit, clang(1480, 0.8, 1.0, 0.35), 0.01, 0.4)
+    write("sfx/critical", normalize(fade(reverb(crit, 1.2, 0.25)), -2))
+    fizzle = bp(noise(int(0.4 * SR)), 300, 1200) * exp_decay(int(0.4 * SR), 0.1)
+    write("sfx/no_focus", normalize(fade(fizzle), -10))
+
+
 # ---------------------------------------------------------------- music
 
 def court_music() -> None:
@@ -446,7 +638,7 @@ def court_music() -> None:
               ("A1", ["A2", "C#3", "E3"]), ("D2", ["D3", "F3", "A3"]), ("F1", ["F2", "A2", "C3"]),
               ("Eb2", ["Eb3", "G3", "Bb3"]), ("A1", ["A2", "C#3", "E3"])]
     pad = np.zeros(length)
-    battle = np.zeros(length)
+    arp = np.zeros(length)
     for i, (bass, voices) in enumerate(chords):
         at = i * 8 * beat
         span = 8 * beat + 1.2
@@ -454,18 +646,10 @@ def court_music() -> None:
             place_wrapped(pad, pad_voice(n(v), span, 1200), at, 0.32)
             place_wrapped(pad, choir_voice(n(v) + 12, span), at, 0.11)
         place_wrapped(pad, pad_voice(n(bass), span, 380, 4), at, 0.5)
-        # Battle: timpani on the root, low string ostinato in eighths.
-        root = n(bass) + (12 if n(bass) < n("C2") else 0)
-        for bar in range(2):
-            bar_at = at + bar * 4 * beat
-            place_wrapped(battle, timpani(root + 12, 1.4), bar_at, 0.9)
-            place_wrapped(battle, timpani(root + 12, 1.0), bar_at + 2 * beat, 0.55)
-            place_wrapped(battle, timpani(root + 19, 0.6), bar_at + 3.5 * beat, 0.4)
-            for e in range(8):
-                note = root + 12 + (7 if e % 4 == 2 else 0) + (12 if e == 7 else 0)
-                stab = lp(saw(midi(note), beat * 0.45) + saw(midi(note) * 1.005, beat * 0.45), 900)
-                stab *= env_adsr(len(stab), 0.005, 0.08, 0.5, 0.1)
-                place_wrapped(battle, stab, bar_at + e * beat / 2, 0.16 if e % 2 else 0.22)
+        tones = [n(v) + 12 for v in voices] + [n(voices[0]) + 24]
+        for e in range(16):
+            order = [0, 1, 2, 3, 2, 1, 0, 2][e % 8]
+            place_wrapped(arp, harpsichord(tones[order], 1.2), at + e * beat / 2, 0.2 if e % 2 == 0 else 0.13)
     melody_notes = [("A4", 2), ("F4", 1), ("E4", 1), ("D4", 3), (None, 1),
                     ("F4", 2), ("G4", 1), ("A4", 1), ("Bb4", 2), ("A4", 2),
                     ("G4", 2), ("Bb4", 1), ("A4", 1), ("G4", 2), ("D4", 2),
@@ -483,9 +667,10 @@ def court_music() -> None:
             place_wrapped(melody, organ_lead(n(name) - 12, beats * beat * 0.95 + 0.3), at, 0.1)
         at += beats * beat
     assert abs(at - length_s) < 1e-6, at
-    write("music/court_pad", rms_normalize(loop_reverb(pad, seconds=4.5, wet=0.45, tone=3500), -21), True)
-    write("music/court_melody", rms_normalize(loop_reverb(melody, seconds=4.0, wet=0.5, tone=4500), -23), True)
-    write("music/court_battle", rms_normalize(loop_reverb(battle, seconds=2.2, wet=0.28, tone=3000), -22), True)
+    # Dungeon synth: warped tape and soft saturation on the pads, a plucked arpeggio under the organ.
+    write("music/court_pad", rms_normalize(tape(loop_reverb(pad, seconds=4.5, wet=0.45, tone=3500)), -21), True)
+    melody = melody + arp
+    write("music/court_melody", rms_normalize(tape(loop_reverb(melody, seconds=4.0, wet=0.5, tone=4500), 0.0025), -23), True)
 
 
 def ruins_music() -> None:
@@ -500,25 +685,17 @@ def ruins_music() -> None:
     shapes = {"Dm": ["D3", "A3", "D4", "F4"], "C": ["C3", "G3", "C4", "E4"], "Am": ["A2", "E3", "A3", "C4"],
               "F": ["F2", "C3", "F3", "A3"], "G": ["G2", "D3", "G3", "B3"]}
     base = np.zeros(length)
-    battle = np.zeros(length)
     base += hurdy_drone([n("D2"), n("A2")], length_s) * 0.22
-    buzz = []
+    for i, chord in enumerate(progression):
+        if i % 2 == 0:
+            for v in shapes[chord][1:]:
+                place_wrapped(base, pad_voice(n(v), 2 * bar_s + 1.0, 1100, 12), i * bar_s, 0.07)
     for i, chord in enumerate(progression):
         at = i * bar_s
         tones = shapes[chord]
         pattern = [tones[0], tones[1], tones[2], tones[3], tones[2], tones[1]]
         for k, tone in enumerate(pattern):
             place_wrapped(base, lute(n(tone), 1.6), at + k * beat / 2, 0.42 if k == 0 else 0.28)
-        place_wrapped(battle, frame_drum(True), at, 0.9)
-        place_wrapped(battle, frame_drum(False), at + beat, 0.5)
-        place_wrapped(battle, frame_drum(False), at + 2 * beat, 0.5)
-        place_wrapped(battle, frame_drum(False), at + 2.5 * beat, 0.35)
-        place_wrapped(battle, jingle(), at + 1.5 * beat, 0.5)
-        buzz += [at, at + beat, at + 2 * beat]
-        for k in range(6):
-            strum = lute(n(tones[k % 2 + 1]) + 12, 0.5)
-            place_wrapped(battle, strum, at + k * beat / 2 + beat / 4, 0.12)
-    battle += hurdy_drone([n("D3"), n("A3")], length_s, buzz) * 0.25
     tune = [("D5", 1), ("E5", .5), ("F5", .5), ("G5", 1), ("A5", 2), ("F5", 1),
             ("E5", 1), ("D5", .5), ("C5", .5), ("E5", 1), ("G5", 2), ("E5", 1),
             ("F5", 1), ("E5", .5), ("D5", .5), ("A4", 1), ("D5", 2), ("E5", 1),
@@ -539,7 +716,7 @@ def ruins_music() -> None:
     assert abs(at - length_s) < 1e-6, (at, length_s)
     write("music/ruins_base", rms_normalize(loop_reverb(base, seconds=2.4, wet=0.32, tone=5000), -21), True)
     write("music/ruins_melody", rms_normalize(loop_reverb(melody, seconds=2.6, wet=0.35, tone=6000), -23), True)
-    write("music/ruins_battle", rms_normalize(loop_reverb(battle, seconds=1.6, wet=0.2, tone=5000), -22), True)
+
 
 
 def stingers() -> None:
@@ -596,3 +773,7 @@ if __name__ == "__main__":
     ruins_music()
     stingers()
     ambience()
+    special_sfx()
+    court_combat()
+    ruins_combat()
+    notice_stinger()

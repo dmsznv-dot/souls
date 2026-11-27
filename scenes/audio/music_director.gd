@@ -1,34 +1,46 @@
 extends Node
-## Autoload "Music". Each area plays three sample-aligned stems in one AudioStreamSynchronized:
-## base, melody and battle. Intensity fades stems in and out without losing sync; changing area
-## crossfades two such players, so walking from one area into the next never cuts the score.
+## Autoload "Music". Every area has an exploration score and a separate combat theme, each a
+## set of sample-aligned stems in one AudioStreamSynchronized. When a foe notices the player a
+## stinger hits, the exploration score drops away and the combat theme starts from its top;
+## when the fight ends the score returns. Areas crossfade, so walking across the bridge
+## never cuts the music.
 ##
-## Intensity: 0 = base only (aftermath, menus), 1 = exploring (base + melody), 2 = combat (all).
+## Intensity: 0 = exploration base only (aftermath), 1 = exploration with melody, 2 = combat.
+## Combat phase 2 adds the theme's third stem (choir and bells for the Gatekeeper).
 
 const AREAS := {
-	&"court": ["res://assets/audio/music/court_pad.ogg", "res://assets/audio/music/court_melody.ogg",
-		"res://assets/audio/music/court_battle.ogg"],
-	&"ruins": ["res://assets/audio/music/ruins_base.ogg", "res://assets/audio/music/ruins_melody.ogg",
-		"res://assets/audio/music/ruins_battle.ogg"],
+	&"court": {
+		"explore": ["res://assets/audio/music/court_pad.ogg", "res://assets/audio/music/court_melody.ogg"],
+		"combat": ["res://assets/audio/music/court_combat_rhythm.ogg", "res://assets/audio/music/court_combat_lead.ogg",
+			"res://assets/audio/music/court_combat_phase.ogg"],
+	},
+	&"ruins": {
+		"explore": ["res://assets/audio/music/ruins_base.ogg", "res://assets/audio/music/ruins_melody.ogg"],
+		"combat": ["res://assets/audio/music/ruins_combat_rhythm.ogg", "res://assets/audio/music/ruins_combat_lead.ogg",
+			"res://assets/audio/music/ruins_combat_phase.ogg"],
+	},
 }
 const STINGERS := {
 	&"victory": "res://assets/audio/music/victory.ogg",
 	&"defeat": "res://assets/audio/music/defeat.ogg",
+	&"notice": "res://assets/audio/music/notice.ogg",
 }
 const WIND := "res://assets/audio/ambience/wind.ogg"
 const TORCH := "res://assets/audio/ambience/torch.ogg"
 const SILENT_DB := -60.0
-## Layer gains per intensity, in dB: [base, melody, battle].
-const MIX := [[0.0, SILENT_DB, SILENT_DB], [0.0, -1.5, SILENT_DB], [-2.0, -5.0, 0.0]]
+## Seconds before another notice stinger may play.
+const NOTICE_REST := 10.0
 
 var area: StringName
 var intensity: int = 1
+var combat_phase: int = 1
 var _players: Dictionary = {}
-var _area_gain: Dictionary = {}
+var _gain: Dictionary = {}
 var _layer_db: Dictionary = {}
 var _wind: AudioStreamPlayer
 var _stinger: AudioStreamPlayer
 var _duck: float
+var _notice_rest: float
 
 
 func _ready() -> void:
@@ -54,32 +66,51 @@ func _exit_tree() -> void:
 func play_area(next: StringName, crossfade: float = 3.0) -> void:
 	if not AREAS.has(next):
 		return
-	if not _players.has(next):
+	for kind in ["explore", "combat"]:
+		var key := _key(next, kind)
+		if _players.has(key):
+			continue
+		var paths: Array = AREAS[next][kind]
 		var synced := AudioStreamSynchronized.new()
-		synced.stream_count = 3
-		for i in 3:
-			synced.set_sync_stream(i, _looping(AREAS[next][i]))
+		synced.stream_count = paths.size()
+		for i in paths.size():
+			synced.set_sync_stream(i, _looping(paths[i]))
 			synced.set_sync_stream_volume(i, SILENT_DB)
 		var player := AudioStreamPlayer.new()
-		player.name = "Score_%s" % next
+		player.name = "Score_%s" % String(key).replace(":", "_")
 		player.stream = synced
 		player.bus = &"Music"
 		player.volume_db = SILENT_DB
 		add_child(player)
-		_players[next] = player
-		_area_gain[next] = 0.0
-		_layer_db[next] = PackedFloat32Array([SILENT_DB, SILENT_DB, SILENT_DB])
+		_players[key] = player
+		_gain[key] = 0.0
+		var layers := PackedFloat32Array()
+		layers.resize(paths.size())
+		layers.fill(SILENT_DB)
+		_layer_db[key] = layers
 	area = next
-	var player: AudioStreamPlayer = _players[next]
-	if not player.playing:
-		player.play()
 	if not _wind.playing:
 		_wind.play()
 	set_meta(&"crossfade", maxf(crossfade, 0.05))
 
 
+## 0..2. Entering combat plays the notice stinger and restarts the combat theme.
 func set_intensity(level: int) -> void:
-	intensity = clampi(level, 0, 2)
+	level = clampi(level, 0, 2)
+	if level == 2 and intensity < 2 and not area.is_empty():
+		var combat: AudioStreamPlayer = _players[_key(area, "combat")]
+		if _gain[_key(area, "combat")] < 0.05:
+			combat.play()
+		if _notice_rest <= 0.0:
+			stinger(&"notice")
+			_notice_rest = NOTICE_REST
+	if level < 2:
+		combat_phase = 1
+	intensity = level
+
+
+func set_combat_phase(phase: int) -> void:
+	combat_phase = clampi(phase, 1, 2)
 
 
 func stinger(name: StringName) -> void:
@@ -87,7 +118,7 @@ func stinger(name: StringName) -> void:
 		return
 	_stinger.stream = load(STINGERS[name])
 	_stinger.play()
-	_duck = 3.5
+	_duck = 0.8 if name == &"notice" else 3.5
 
 
 func stop_all() -> void:
@@ -116,25 +147,44 @@ func attach_torches(root: Node) -> void:
 func _process(delta: float) -> void:
 	var real_delta := delta / maxf(Engine.time_scale, 0.0001)
 	_duck = maxf(0.0, _duck - real_delta)
+	_notice_rest = maxf(0.0, _notice_rest - real_delta)
 	var fade_time: float = get_meta(&"crossfade", 3.0)
 	for key: StringName in _players:
 		var player: AudioStreamPlayer = _players[key]
-		var goal := 1.0 if key == area else 0.0
-		_area_gain[key] = move_toward(_area_gain[key], goal, real_delta / fade_time)
+		var parts := String(key).split(":")
+		var in_area := StringName(parts[0]) == area
+		var combat := parts[1] == "combat"
+		var wanted := in_area and (combat == (intensity == 2))
+		# Into a fight quickly, out of it slowly; area changes use the crossfade time.
+		var rate := (1.0 / 0.6 if combat else 1.0 / 1.6) if in_area else 1.0 / fade_time
+		_gain[key] = move_toward(_gain[key], 1.0 if wanted else 0.0, real_delta * rate)
+		if wanted and not player.playing:
+			player.play()
 		var ducked := 0.45 if _duck > 0.0 else 1.0
-		player.volume_db = linear_to_db(maxf(_area_gain[key] * ducked, 0.001))
-		if _area_gain[key] <= 0.0 and key != area and player.playing:
+		player.volume_db = linear_to_db(maxf(_gain[key] * ducked, 0.001))
+		if _gain[key] <= 0.0 and player.playing:
 			player.stop()
 		var synced := player.stream as AudioStreamSynchronized
 		var layers: PackedFloat32Array = _layer_db[key]
-		for i in 3:
-			var target: float = MIX[intensity][i]
-			# Layers move in amplitude, about 1.2 s for a full fade, so entries swell rather than cut.
+		for i in layers.size():
+			var target := _layer_target(combat, i)
 			var current := db_to_linear(layers[i])
 			var next := move_toward(current, db_to_linear(target), real_delta / 1.2)
 			layers[i] = linear_to_db(maxf(next, 0.001))
 			synced.set_sync_stream_volume(i, layers[i])
 		_layer_db[key] = layers
+
+
+func _layer_target(combat: bool, layer: int) -> float:
+	if combat:
+		return 0.0 if layer < 2 or combat_phase == 2 else SILENT_DB
+	if layer == 0:
+		return 0.0
+	return -1.5 if intensity >= 1 else SILENT_DB
+
+
+func _key(area_name: StringName, kind: String) -> StringName:
+	return StringName("%s:%s" % [area_name, kind])
 
 
 func _looping(path: String) -> AudioStream:

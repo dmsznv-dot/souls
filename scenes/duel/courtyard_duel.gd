@@ -104,6 +104,7 @@ func _finish(result: StringName) -> void:
 
 
 func _on_boss_phase(phase: int) -> void:
+	Music.set_combat_phase(phase)
 	$Interface/GuardMeters/Caption.text = "THE ASH GATEKEEPER  ·  %s" % ("II" if phase == 2 else "I")
 	_show_notice("The Gatekeeper readies his blade", 1.8)
 

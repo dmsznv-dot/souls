@@ -124,7 +124,10 @@ func advance(delta: float) -> void:
 		action_age += delta
 	if attack != null and action_age >= attack.windup and previous_age < attack.windup + attack.active:
 		if previous_age < attack.windup:
-			_emit(&"heavy" if attack.impact >= 0.6 else &"swing", attack.impact)
+			if attack.damage_type == AttackData.DamageType.MAGIC:
+				_emit(&"cast", attack.impact)
+			else:
+				_emit(&"heavy" if attack.impact >= 0.6 else &"swing", attack.impact)
 			if attack.projectile_speed > 0.0:
 				_launch_bolt()
 		if attack.projectile_speed <= 0.0:

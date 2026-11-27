@@ -18,6 +18,13 @@ const POOLS := {
 	&"death": ["death"],
 	&"tired": ["tired"],
 	&"gate_open": ["gate_open"],
+	&"cast": ["cast"],
+	&"nova": ["nova"],
+	&"shockwave": ["shockwave"],
+	&"charged": ["charged"],
+	&"skid": ["skid"],
+	&"critical": ["critical"],
+	&"no_focus": ["no_focus"],
 }
 const STINGER_CUES: Array[StringName] = [&"victory", &"defeat"]
 const VOLUME_DB := -4.0
