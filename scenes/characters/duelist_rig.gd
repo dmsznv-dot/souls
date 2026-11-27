@@ -16,7 +16,7 @@ const EXTRA: AnimationLibrary = preload("res://assets/animations/quaternius_extr
 enum { HUMAN, ZOMBIE, GHOUL, BRUTE }
 ## Portion of a source clip mapped onto an action's 0..1 timeline.
 const CLIP_WINDOWS := {
-	&"mocap_roll": Vector2(0.0, 0.72), &"death": Vector2(0.0, 0.8), &"hit_chest": Vector2(0.0, 1.0),
+	&"mocap_roll": Vector2(0.0, 0.72), &"death": Vector2(0.0, 1.0), &"hit_knockback": Vector2(0.0, 1.0), &"hit_chest": Vector2(0.0, 1.0),
 	&"zombie_scratch": Vector2(0.08, 0.86), &"melee_hook": Vector2(0.0, 1.0), &"punch_cross": Vector2(0.05, 0.9),
 	&"sword_dash": Vector2(0.1, 0.85), &"spell_shoot": Vector2(0.0, 1.0), &"shield_dash": Vector2(0.05, 0.9),
 }
@@ -117,6 +117,12 @@ var _blade_tip: Marker3D
 var _trail: MeshInstance3D
 var _jaw: Node3D
 var _weapon_dropped := false
+var _club: MeshInstance3D
+var _club_rest := Transform3D.IDENTITY
+var _body_points: Array = []
+var _ground_settled := false
+var _ground_drop := 0.0
+var _ground_cape := Quaternion.IDENTITY
 var _steps: AudioStreamPlayer3D
 const STEP_TAKES := ["step_0", "step_1", "step_2", "step_3", "step_4"]
 
@@ -452,9 +458,10 @@ func _dress_brute() -> void:
 	_box("HandL","Fist",Vector3(.13,.12,.11),hide,Vector3(0,-.06,0))
 	_limb("ArmR","Upper",hide,.26,.14,.11,7)
 	_limb("ElbowR","Growth",rock,.22,.13,.16,6)
-	_loft("HandR","Club",rock,[Vector4(-.38,.06,.06,0),Vector4(-.2,.2,.18,0),Vector4(.02,.15,.14,0)],6)
+	_club = _loft("HandR","Club",rock,[Vector4(-.38,.06,.06,0),Vector4(-.2,.2,.18,0),Vector4(.02,.15,.14,0)],6)
 	for k in 4:
-		_box("HandR","Seam%d" % k,Vector3(.02,.2,.012),glow,Vector3(-.1 + k * .07,-.18,-.17 + (k % 2) * .02),Vector3(0,0,15 - k * 10))
+		_box("HandR","Seam%d" % k,Vector3(.02,.2,.012),glow,Vector3(-.1 + k * .07,-.18,-.17 + (k % 2) * .02),Vector3(0,0,15 - k * 10), _club)
+	_club_rest = _club.transform
 
 func _double_sided(source: StandardMaterial3D) -> StandardMaterial3D:
 	var mat := source.duplicate() as StandardMaterial3D
@@ -663,6 +670,99 @@ func _clip_for(action: StringName) -> StringName:
 			if action == &"enemy_thrust": return &"punch_cross"
 	return action
 
+## Lying poses rest on the floor whatever the body plan and scale: the lowest vertex of the
+## body (cape, held weapon and club aside) is brought to the ground. Once the clip has settled
+## the correction is kept instead of measured again every step.
+func _ground_body(phase: float) -> void:
+	var cape := skeleton.find_bone("Cape")
+	if phase >= 1.0 and _ground_settled:
+		var pelvis := skeleton.get_bone_pose_position(0)
+		skeleton.set_bone_pose_position(0, pelvis - Vector3(0, _ground_drop, 0))
+		skeleton.set_bone_pose_rotation(cape, _ground_cape)
+		return
+	if _body_points.is_empty():
+		_collect_body_points()
+	var lowest := INF
+	for entry: Array in _body_points:
+		var pose := skeleton.get_bone_global_pose(entry[0])
+		for point in entry[1]:
+			lowest = minf(lowest, (pose * point).y)
+	if lowest == INF:
+		return
+	_ground_drop = clampf(lowest - 0.005, -0.5, 0.8)
+	var pelvis := skeleton.get_bone_pose_position(0)
+	skeleton.set_bone_pose_position(0, pelvis - Vector3(0, _ground_drop, 0))
+	_lay_cape()
+	_ground_cape = skeleton.get_bone_pose_rotation(cape)
+	_ground_settled = phase >= 1.0
+	if _club != null and not _club.top_level:
+		_drop_club()
+
+## Vertices of every visible body part, in the space of the bone that carries it.
+func _collect_body_points() -> void:
+	for attachment in skeleton.get_children():
+		if not attachment is BoneAttachment3D or attachment.name == &"Cape":
+			continue
+		var points := PackedVector3Array()
+		for part in attachment.find_children("*", "MeshInstance3D", true, false):
+			if part.mesh == null or not part.visible or part.name == &"BladeTrail":
+				continue
+			if (_weapon_root != null and _weapon_root.is_ancestor_of(part)) or (_club != null and (_club == part or _club.is_ancestor_of(part))):
+				continue
+			var local := Transform3D.IDENTITY
+			var node: Node = part
+			while node != attachment:
+				local = (node as Node3D).transform * local
+				node = node.get_parent()
+			for surface in part.mesh.get_surface_count():
+				for vertex: Vector3 in part.mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]:
+					points.append(local * vertex)
+		if not points.is_empty():
+			_body_points.append([skeleton.find_bone(attachment.bone_name), points])
+
+## A mantle under a body lying on the ground spreads over the floor instead of sinking through:
+## the cape bone is swung toward the body until its lowest corner clears the floor.
+func _lay_cape() -> void:
+	var cape := skeleton.find_bone("Cape")
+	var parent := skeleton.get_bone_global_pose(skeleton.get_bone_parent(cape))
+	var origin := skeleton.get_bone_pose_position(cape)
+	var current := skeleton.get_bone_pose_rotation(cape)
+	var corners := PackedVector3Array()
+	for part in skeleton.get_node("Cape").get_children():
+		if part is MeshInstance3D and part.visible and part.mesh != null:
+			var box: AABB = part.mesh.get_aabb()
+			for i in 8:
+				corners.append(part.transform * box.get_endpoint(i))
+	if corners.is_empty():
+		return
+	var best := current
+	var best_low := -INF
+	for step in 13:
+		for sign in [1.0, -1.0]:
+			var turn := Quaternion(Vector3.RIGHT, sign * deg_to_rad(step * 10.0)) * current
+			var pose := parent * Transform3D(Basis(turn), origin)
+			var low := INF
+			for corner in corners:
+				low = minf(low, (pose * corner).y)
+			if low > best_low + 0.005:
+				best_low = low
+				best = turn
+			if low >= 0.0:
+				skeleton.set_bone_pose_rotation(cape, turn)
+				return
+	skeleton.set_bone_pose_rotation(cape, best)
+
+## The brute lets go of its club when it falls; the club lies where the hand let it go.
+func _drop_club() -> void:
+	var at := _club.global_transform
+	_club.top_level = true
+	var heading := at.basis.y
+	heading.y = 0.0
+	var yaw := atan2(heading.x, heading.z) if heading.length_squared() > 0.001 else 0.0
+	var scale := at.basis.get_scale()
+	_club.global_transform = Transform3D(Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, PI * 0.5) * Basis.from_scale(scale),
+			Vector3(at.origin.x, 0.2 * scale.y, at.origin.z))
+
 ## Skid and landing crouch layered over whatever the clip produced.
 func _apply_weight(delta: float) -> void:
 	_dip = move_toward(_dip, 0.0, delta * 3.2)
@@ -767,6 +867,9 @@ func apply_motion(clip: StringName, phase: float, local_motion: Vector2, delta: 
 	elif clip != &"dead" and _weapon_dropped:
 		_weapon_dropped = false
 		set_weapon(weapon)
+		if _club != null and _club.top_level:
+			_club.top_level = false
+			_club.transform = _club_rest
 	if weapon != null and weapon.form == SoulsWeapon.Form.JAVELIN:
 		_weapon_root.visible = clip != &"enemy_throw" or phase < 0.44 or phase > 0.94
 	if blend_remaining > 0.0:
@@ -777,6 +880,11 @@ func apply_motion(clip: StringName, phase: float, local_motion: Vector2, delta: 
 			skeleton.set_bone_pose_rotation(i,blend_start[i].slerp(skeleton.get_bone_pose_rotation(i),weight))
 	_apply_weight(delta)
 	_drive_arms(clip, phase)
+	if clip in [&"dead", &"knockdown"]:
+		_ground_body(phase)
+	elif _ground_settled or not _body_points.is_empty():
+		_ground_settled = false
+		_body_points.clear()
 	if lean != Vector2.ZERO and clip != &"roll" and clip != &"dead":
 		# Upper body tips into acceleration and away from hard stops; capped near 9 degrees.
 		var chest := skeleton.find_bone("Chest")

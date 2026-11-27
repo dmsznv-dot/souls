@@ -121,15 +121,17 @@ func _bake(source: Skeleton3D, player: AnimationPlayer, clip: String, target: Sk
 				Basis.from_euler(Vector3(deg_to_rad(-7.0), 0, 0)).get_rotation_quaternion())
 		var pelvis := _pose(source, "pelvis").origin - _pose(source, "root").origin
 		offsets.append((pelvis - bind_pelvis) * leg_ratio)
-	# Remove horizontal travel: physics owns the body's position.
+	# Remove horizontal travel: physics owns the body's position. Height is kept as it is, so a
+	# body that falls stays down (an earlier version removed vertical drift too and lifted every
+	# corpse back to standing height by the end of the death clip).
 	var drift := offsets[-1] - offsets[0]
+	drift.y = 0.0
 	for k in frames:
 		var offset := offsets[k] - drift * (float(k) / (frames - 1))
-		var mean := Vector3.ZERO
 		offset.x *= 0.25
 		offset.z *= 0.25
 		anim.position_track_insert_key(height, float(k) / (frames - 1),
-				target.get_bone_rest(0).origin + Vector3(offset.x, offset.y, offset.z) + mean)
+				target.get_bone_rest(0).origin + Vector3(offset.x, offset.y, offset.z))
 	return anim
 
 

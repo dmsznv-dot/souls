@@ -15,6 +15,7 @@ func _initialize() -> void:
 func _run() -> void:
 	await _test_kinds()
 	await _test_boss()
+	await _test_corpses()
 	print("Foes: %d/%d checks passed." % [_checks - _failures, _checks])
 	quit(0 if _failures == 0 else 1)
 
@@ -123,6 +124,23 @@ func _test_boss() -> void:
 		await physics_frame
 		ticks += 1
 	_check(ticks > roundi((plain.windup + 0.45) * 60.0), "the delayed overhead hangs before it falls (%d ticks)" % ticks)
+
+
+## Every body plan comes to rest on the floor: nothing floats and nothing sinks through.
+func _test_corpses() -> void:
+	for kind in ["husk", "ghoul", "brute", "bone_sentry", "shieldbearer"]:
+		var foe := await _spawn(kind, 3.0, false)
+		var hero := current_scene.get_node("Player")
+		foe.get_node("Combat").health = 1.0
+		foe.get_node("Combat").receive_attack(hero.get_node("Combat"), load("res://scenes/duel/combat/heavy.tres"))
+		await _ticks(130)
+		var low := INF
+		for part in foe.get_node("Heading/Rig").find_children("*", "MeshInstance3D", true, false):
+			if part.name == &"BladeTrail" or not part.is_visible_in_tree() or part.mesh == null:
+				continue
+			for v in part.mesh.get_faces():
+				low = minf(low, (part.global_transform * v).y)
+		_check(low > -0.04 and low < 0.06, "a fallen %s lies on the floor (lowest point %.3f m)" % [kind, low])
 
 
 func _spawn(kind: String, distance: float, ai: bool = true) -> CharacterBody3D:
