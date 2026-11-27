@@ -2,6 +2,9 @@ extends Node3D
 
 const Combatant = preload("res://scenes/duel/combat/combatant.gd")
 const HudUtil = preload("res://scenes/ui/hud_util.gd")
+const NoirLighting = preload("res://scenes/fx/noir_lighting.gd")
+## Magenta neon fills: the gate's flanking arches and a rim from behind the player's start.
+const ACCENTS := [Vector3(-4.4, 2.4, -10.6), Vector3(4.4, 2.4, -10.6), Vector3(0.0, 4.6, 7.8)]
 const GATE_DISTANCE := 2.45
 
 @export_file("*.tscn") var post_victory_path: String
@@ -34,6 +37,8 @@ func _ready() -> void:
 	_hero.defeated.connect(_finish.bind(&"defeat"))
 	_guard.defeated.connect(_finish.bind(&"victory"))
 	_guard_hp.max_value = _guard.max_health
+	NoirLighting.apply($Environment, ACCENTS)
+	NoirLighting.toon(self)
 	Music.play_area(&"court", 1.5)
 	RetroFX.prewarm.call_deferred(get_viewport().get_camera_3d())
 	Music.attach_torches(self)

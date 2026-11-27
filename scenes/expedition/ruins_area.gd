@@ -9,6 +9,9 @@ signal cleared
 const Combatant = preload("res://scenes/duel/combat/combatant.gd")
 const DISSOLVE := preload("res://scenes/expedition/gate/gate_dissolve.gdshader")
 const STONE := preload("res://scenes/expedition/gate/court_stone.tres")
+const NoirLighting = preload("res://scenes/fx/noir_lighting.gd")
+## Magenta fills along the road and under the shrine (area space).
+const ACCENTS := [Vector3(-6.4, 2.2, -5.0), Vector3(6.4, 2.2, -14.5), Vector3(-6.4, 2.2, -23.0), Vector3(0.0, 3.2, -28.0)]
 const CAPTIONS := {
 	&"spearman": "PALE SPEARMAN",
 	&"shield": "ASH SHIELDBEARER",
@@ -31,6 +34,10 @@ func setup(player: CharacterBody3D, streamed: bool) -> void:
 		$Environment/WorldEnvironment.free()
 		$Environment/EveningLight.free()
 		open_entrance()
+	var accents := []
+	for point: Vector3 in ACCENTS:
+		accents.append(global_transform * point)
+	NoirLighting.apply(self, accents)
 
 
 func enemies() -> Array[Node]:

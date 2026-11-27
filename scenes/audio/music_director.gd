@@ -130,8 +130,8 @@ func stop_all() -> void:
 
 ## Positional crackle on every lantern light under root (names starting with "Lamp").
 func attach_torches(root: Node) -> void:
-	for light in root.find_children("Lamp*", "OmniLight3D", true, false):
-		if light.has_node("Crackle"):
+	for light in root.find_children("*", "OmniLight3D", true, false):
+		if light.has_node("Crackle") or not (light.name.begins_with("Lamp") or light.name.begins_with("WatchFire")):
 			continue
 		var crackle := AudioStreamPlayer3D.new()
 		crackle.name = "Crackle"
