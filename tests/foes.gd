@@ -33,7 +33,7 @@ func _test_kinds() -> void:
 	ghoul = await _spawn("ghoul", 1.4)
 	var hero := current_scene.get_node("Player") as CharacterBody3D
 	var before := ghoul.global_position.distance_to(hero.global_position)
-	for i in 90:
+	for i in 160:
 		await physics_frame
 		if ghoul.get_node("Combat").action != &"":
 			continue

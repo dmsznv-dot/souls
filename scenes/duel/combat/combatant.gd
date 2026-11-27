@@ -24,7 +24,7 @@ const RESISTANCE := {
 	&"plate": [0.8, 1.0, 1.3, 1.1], &"cloth": [1.2, 1.0, 0.9, 1.0],
 	&"hide": [0.9, 1.15, 0.8, 1.2], &"bone": [0.9, 0.8, 1.25, 1.0],
 }
-const BLADE_SUBSTEPS: int = 4
+const BLADE_SUBSTEPS: int = 6
 
 @export var light_attack: AttackData
 @export var heavy_attack: AttackData

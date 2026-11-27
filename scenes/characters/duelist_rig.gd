@@ -699,7 +699,13 @@ func _drop_weapon() -> void:
 func blade_segment() -> PackedVector3Array:
 	if _blade_tip == null or not _blade_tip.is_inside_tree():
 		return PackedVector3Array()
-	return PackedVector3Array([_blade_base.global_position, _blade_tip.global_position])
+	if _weapon_dropped:
+		return PackedVector3Array([_blade_base.global_position, _blade_tip.global_position])
+	# Read the hand from the skeleton pose set this physics step, not from the BoneAttachment,
+	# which only follows the skeleton once per rendered frame.
+	var hand := skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone("HandR"))
+	var grip := hand * _weapon_root.transform
+	return PackedVector3Array([grip * _blade_base.position, grip * _blade_tip.position])
 
 ## Leans the upper body into acceleration. x = sideways, y = forward.
 func set_lean(value: Vector2) -> void:
