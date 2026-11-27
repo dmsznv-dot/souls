@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="SoulsWeapon" format=3]
+
+[ext_resource type="Script" path="res://scenes/combat/weapons/weapon_data.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/duel/combat/attack_data.gd" id="s"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/attacks/greatsword_light_a.tres" id="a0"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/attacks/greatsword_light_b.tres" id="a1"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/attacks/greatsword_heavy.tres" id="a2"]
+
+[resource]
+script = ExtResource("1")
+display_name = "Gatebreaker Greatsword"
+form = 2
+light_chain = Array[ExtResource("s")]([ExtResource("a0"), ExtResource("a1")])
+heavy = ExtResource("a2")
+blade_length = 1.42
+grip_length = 0.36
+blade_half_width = 0.062
+dead_length = 0.1
+mass = 9.0
+two_handed = true
+trail_color = Color(1, 0.62, 0.34, 0.6)

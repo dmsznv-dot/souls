@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SoulsWeapon" format=3]
+
+[ext_resource type="Script" path="res://scenes/combat/weapons/weapon_data.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/duel/combat/attack_data.gd" id="s"]
+[ext_resource type="Resource" path="res://scenes/duel/combat/light.tres" id="a0"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/attacks/longsword_light_b.tres" id="a1"]
+[ext_resource type="Resource" path="res://scenes/duel/combat/heavy.tres" id="a2"]
+
+[resource]
+script = ExtResource("1")
+display_name = "Ashen Longsword"
+form = 1
+light_chain = Array[ExtResource("s")]([ExtResource("a0"), ExtResource("a1")])
+heavy = ExtResource("a2")
+blade_length = 0.91
+grip_length = 0.19
+blade_half_width = 0.034
+dead_length = 0.12
+mass = 3.0
+trail_color = Color(0.95, 0.88, 0.76, 0.55)

@@ -5,9 +5,15 @@
 [ext_resource type="Script" path="res://scenes/duel/combat/combatant.gd" id="3_combat"]
 [ext_resource type="Resource" path="res://scenes/duel/combat/light.tres" id="4_light"]
 [ext_resource type="Resource" path="res://scenes/duel/combat/heavy.tres" id="5_heavy"]
+[ext_resource type="Script" path="res://scenes/combat/weapons/weapon_data.gd" id="6_weapon"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/longsword.tres" id="7_long"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/shortsword.tres" id="8_short"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/greatsword.tres" id="9_great"]
 
 [node name="Player" instance=ExtResource("1_player")]
-move_acceleration = 44.0
+move_acceleration = 38.0
+move_deceleration = 24.0
+weapons = Array[ExtResource("6_weapon")]([ExtResource("7_long"), ExtResource("8_short"), ExtResource("9_great")])
 
 [node name="Cloak" parent="Heading" index="0"]
 visible = false
@@ -28,6 +34,7 @@ visible = false
 visible = false
 
 [node name="Rig" parent="Heading" index="6" instance=ExtResource("2_rig")]
+body_style = 1
 
 [node name="CameraRig" parent="." index="3"]
 lock_yaw_offset = 0.30

@@ -2,6 +2,7 @@ extends CharacterBody3D
 
 const Combatant = preload("res://scenes/duel/combat/combatant.gd")
 const BOSS_CLEAVE = preload("res://scenes/expedition/enemies/boss_cleave.tres")
+const BOSS_WEAPON = preload("res://scenes/combat/weapons/greatsword.tres")
 
 signal phase_changed(phase: int)
 
@@ -32,6 +33,7 @@ func _ready() -> void:
 		_combat.max_health = 154.0
 		_combat.health = _combat.max_health
 		_rig.scale *= 1.12
+		_rig.set_weapon(BOSS_WEAPON)
 		$LockPoint.position.y = 1.57
 
 
@@ -52,6 +54,7 @@ func _physics_process(delta: float) -> void:
 	var motion := -_heading.global_basis.z * _combat.lunge_speed()
 	if ai_enabled and is_instance_valid(player) and _combat.action == &"" and not _combat.contact_frozen:
 		motion = _read_player(delta)
+	motion += _combat.push
 	velocity.x = motion.x
 	velocity.z = motion.z
 	if not is_on_floor():

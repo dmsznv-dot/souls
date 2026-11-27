@@ -29,6 +29,7 @@ func _ready() -> void:
 	remaining_enemies = _enemies.size()
 	_hero.defeated.connect(_finish.bind(&"defeat"))
 	_hero.feedback.connect(_play_feedback)
+	_hero.weapon_changed.connect(func(weapon: SoulsWeapon) -> void: _set_notice(weapon.display_name))
 	for enemy in _enemies:
 		var combat: Combatant = enemy.get_node("Combat")
 		combat.defeated.connect(_enemy_defeated.bind(enemy))
@@ -98,8 +99,9 @@ func _finish(result: StringName) -> void:
 	get_tree().create_timer(0.55).timeout.connect(_result.show)
 
 
-func _play_feedback(cue: StringName, at: Vector3) -> void:
-	_audio.play_cue(cue, at)
+func _play_feedback(cue: StringName, at: Vector3, strength: float = 0.5) -> void:
+	_audio.play_cue(cue, at, strength)
+	$Player.on_world_impact(cue, at, strength)
 	match cue:
 		&"parry": _set_notice("Parried  ·  Counter now")
 		&"guard_break": _set_notice("Guard broken")

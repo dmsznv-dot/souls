@@ -1,5 +1,7 @@
 [gd_scene format=3]
 
+[ext_resource type="Environment" path="res://scenes/fx/ash_haze.tres" id="haze"]
+
 [ext_resource type="PackedScene" path="res://assets/environment/outer_ruins.glb" id="Road"]
 [ext_resource type="PackedScene" path="res://assets/environment/modular-dungeon-kit/gate.glb" id="Gate"]
 [ext_resource type="PackedScene" path="res://assets/environment/modular-dungeon-kit/template-floor.glb" id="Slab"]
@@ -9,31 +11,6 @@
 [ext_resource type="PackedScene" path="res://assets/environment/graveyard-kit/urn-round.glb" id="Vessel"]
 [ext_resource type="PackedScene" path="res://assets/environment/prototype-kit/column-rounded-low.glb" id="Plinth"]
 [ext_resource type="NavigationMesh" path="res://scenes/expedition/environment/outer_navigation.tres" id="Nav"]
-
-[sub_resource type="ProceduralSkyMaterial" id="Dusk"]
-sky_top_color = Color(0.27, 0.27, 0.40, 1)
-sky_horizon_color = Color(0.73, 0.65, 0.72, 1)
-sky_curve = 0.25
-ground_horizon_color = Color(0.68, 0.61, 0.67, 1)
-ground_bottom_color = Color(0.28, 0.29, 0.33, 1)
-sun_angle_max = 4.0
-sun_curve = 0.06
-
-[sub_resource type="Sky" id="Sky"]
-sky_material = SubResource("Dusk")
-
-[sub_resource type="Environment" id="Haze"]
-background_mode = 2
-sky = SubResource("Sky")
-ambient_light_source = 2
-ambient_light_color = Color(0.80, 0.82, 0.89, 1)
-ambient_light_sky_contribution = 0.18
-ambient_light_energy = 0.68
-fog_enabled = true
-fog_density = 0.014
-fog_light_color = Color(0.62, 0.56, 0.66, 1)
-fog_sky_affect = 0.17
-fog_aerial_perspective = 0.12
 
 [sub_resource type="BoxShape3D" id="Ground"]
 size = Vector3(16, 0.46, 41.2)
@@ -56,12 +33,12 @@ size = Vector3(1.45, 4.6, 1.55)
 [node name="OuterRuinsEnvironment" type="Node3D"]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("Haze")
+environment = ExtResource("haze")
 
 [node name="EveningLight" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-37, 25, 0)
-light_color = Color(1, 0.88, 0.76, 1)
-light_energy = 0.99
+light_color = Color(1, 0.8, 0.62, 1)
+light_energy = 1.12
 shadow_enabled = true
 shadow_opacity = 0.67
 directional_shadow_max_distance = 53.0

@@ -16,7 +16,7 @@ const CUES: Dictionary[StringName, AudioStream] = {
 const VOLUME_DB := -7.0
 
 
-func play_cue(cue: StringName, at: Vector3) -> void:
+func play_cue(cue: StringName, at: Vector3, _strength: float = 0.5) -> void:
 	var stream: AudioStream = CUES.get(cue)
 	if stream == null:
 		return

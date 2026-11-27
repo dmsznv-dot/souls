@@ -145,8 +145,8 @@ anchor_left = 0.5
 anchor_right = 0.5
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = -396.0
-offset_right = 396.0
+offset_left = -470.0
+offset_right = 470.0
 offset_top = -52.0
 offset_bottom = -16.0
 mouse_filter = 2
@@ -160,7 +160,7 @@ theme_override_colors/font_shadow_color = Color(0.03, 0.03, 0.045, 0.94)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 2
 theme_override_font_sizes/font_size = 14
-text = "WASD  Move    ·    LMB / R  Attack    ·    RMB / Q  Guard / Parry    ·    Space / F  Dodge / Jump    ·    T  Retry"
+text = "WASD  Move  ·  LMB / R  Attack  ·  RMB / Q  Guard / Parry  ·  Space / F  Dodge / Jump  ·  Shift  Sprint  ·  Tab  Weapon  ·  T  Retry"
 horizontal_alignment = 1
 
 [node name="Result" type="PanelContainer" parent="Interface"]

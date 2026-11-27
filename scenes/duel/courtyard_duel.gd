@@ -32,10 +32,11 @@ func _ready() -> void:
 	_hero.defeated.connect(_finish.bind(&"defeat"))
 	_guard.defeated.connect(_finish.bind(&"victory"))
 	_guard_hp.max_value = _guard.max_health
+	_hero.weapon_changed.connect(func(weapon: SoulsWeapon) -> void: _show_notice(weapon.display_name, 1.2))
 	if not post_victory_path.is_empty():
 		$Guard.phase_changed.connect(_on_boss_phase)
 		$Interface/GuardMeters/Caption.text = "THE ASH GATEKEEPER"
-		$Interface/Bindings/Keys/Other.text = "F / X  Jump   ·   E / A  Gate   ·   T / Menu  Retry   ·   F2  Debug"
+		$Interface/Bindings/Keys/Other.text = "Shift / L3  Sprint   ·   Tab / D-pad  Weapon   ·   F / X  Jump   ·   E / A  Gate   ·   T  Retry   ·   F2  Debug"
 
 
 func _process(delta: float) -> void:
@@ -93,8 +94,9 @@ func _on_boss_phase(phase: int) -> void:
 	_show_notice("The Gatekeeper readies his blade", 1.8)
 
 
-func _on_feedback(cue: StringName, location: Vector3) -> void:
-	_audio.play_cue(cue, location)
+func _on_feedback(cue: StringName, location: Vector3, strength: float = 0.5) -> void:
+	_audio.play_cue(cue, location, strength)
+	$Player.on_world_impact(cue, location, strength)
 	match cue:
 		&"tired":
 			_show_notice("Out of stamina")
