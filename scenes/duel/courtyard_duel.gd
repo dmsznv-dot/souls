@@ -42,10 +42,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if outcome == &"":
-		Music.set_intensity(2 if $Guard.is_engaged() else 1)
-	else:
-		Music.set_intensity(1 if outcome == &"victory" else 0)
+	_update_music()
 	_player_hp.value = _hero.health
 	_stamina.value = _hero.stamina
 	_guard_hp.value = _guard.health
@@ -58,6 +55,13 @@ func _process(delta: float) -> void:
 			_hero.phase_name(), _guard.phase_name(), $Player.buffer_status()]
 		_draw_attack(_hero, _hero_arc)
 		_draw_attack(_guard, _guard_arc)
+
+
+func _update_music() -> void:
+	if outcome == &"":
+		Music.set_intensity(2 if $Guard.is_engaged() else 1)
+	else:
+		Music.set_intensity(1 if outcome == &"victory" else 0)
 
 
 func _unhandled_input(event: InputEvent) -> void:

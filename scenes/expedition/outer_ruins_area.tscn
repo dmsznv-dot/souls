@@ -1,0 +1,26 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/expedition/ruins_area.gd" id="1_area"]
+[ext_resource type="PackedScene" path="res://scenes/expedition/environment/outer_ruins_environment.tscn" id="2_environment"]
+[ext_resource type="PackedScene" path="res://scenes/expedition/enemies/spearman.tscn" id="3_spearman"]
+[ext_resource type="PackedScene" path="res://scenes/expedition/enemies/shieldbearer.tscn" id="4_shield"]
+[ext_resource type="PackedScene" path="res://scenes/expedition/enemies/thrower.tscn" id="5_thrower"]
+
+[node name="OuterRuinsArea" type="Node3D"]
+script = ExtResource("1_area")
+
+[node name="Environment" parent="." instance=ExtResource("2_environment")]
+
+[node name="Entrance" type="Marker3D" parent="."]
+position = Vector3(0, 0.025, 4)
+
+[node name="Enemies" type="Node3D" parent="."]
+
+[node name="Spearman" parent="Enemies" instance=ExtResource("3_spearman")]
+position = Vector3(0, 0.025, -4)
+
+[node name="Shieldbearer" parent="Enemies" instance=ExtResource("4_shield")]
+position = Vector3(-3.2, 0.025, -14)
+
+[node name="Thrower" parent="Enemies" instance=ExtResource("5_thrower")]
+position = Vector3(3.4, 0.025, -23)

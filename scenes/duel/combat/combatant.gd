@@ -183,6 +183,18 @@ func start_boss_phase() -> void:
 	_emit(&"windup", 0.8)
 
 
+## Checkpoint respawn: full vitals, no action in progress.
+func revive() -> void:
+	health = max_health
+	stamina = 100.0
+	posture = 100.0
+	push = Vector3.ZERO
+	combo_step = 0
+	_contact_time = 0.0
+	contact_frozen = false
+	_set_action(&"", 0.0)
+
+
 func is_invulnerable() -> bool:
 	return action == &"roll" and action_age >= ROLL_IFRAMES.x and action_age <= ROLL_IFRAMES.y
 

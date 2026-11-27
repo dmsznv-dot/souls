@@ -89,6 +89,7 @@ var _blade_base: Marker3D
 var _blade_tip: Marker3D
 var _trail: MeshInstance3D
 var _jaw: Node3D
+var _weapon_dropped := false
 var _steps: AudioStreamPlayer3D
 const STEP_TAKES := ["step_0", "step_1", "step_2", "step_3", "step_4"]
 
@@ -470,6 +471,18 @@ func _bone_basis(bone_vector: Vector3, toward: Vector3) -> Basis:
 	z = z.normalized()
 	return Basis(y.cross(z), y, z).orthonormalized()
 
+## The fallen let go: the weapon comes to rest flat on the ground beside the hand.
+func _drop_weapon() -> void:
+	_weapon_dropped = true
+	var hand := _weapon_root.global_position
+	var heading := -_weapon_root.global_basis.z
+	heading.y = 0.0
+	var yaw := atan2(-heading.x, -heading.z) if heading.length_squared() > 0.001 else 0.0
+	_weapon_root.top_level = true
+	_weapon_root.global_transform = Transform3D(Basis(Vector3.UP, yaw).scaled(_weapon_root.global_basis.get_scale()),
+			Vector3(hand.x, 0.06, hand.z))
+	_trail.clear()
+
 ## World-space striking segment of the held weapon: [edge start, point].
 func blade_segment() -> PackedVector3Array:
 	if _blade_tip == null or not _blade_tip.is_inside_tree():
@@ -507,6 +520,11 @@ func apply_motion(clip: StringName, phase: float, local_motion: Vector2, delta: 
 			_jump(phase)
 		_:
 			player.seek(phase,true)
+	if clip == &"dead" and phase > 0.7 and not _weapon_dropped:
+		_drop_weapon()
+	elif clip != &"dead" and _weapon_dropped:
+		_weapon_dropped = false
+		set_weapon(weapon)
 	if weapon != null and weapon.form == SoulsWeapon.Form.JAVELIN:
 		_weapon_root.visible = clip != &"enemy_throw" or phase < 0.44 or phase > 0.94
 	if blend_remaining > 0.0:
