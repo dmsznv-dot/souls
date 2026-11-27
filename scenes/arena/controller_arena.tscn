@@ -1,0 +1,604 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="1_player"]
+
+[sub_resource type="Environment" id="Environment_court"]
+background_mode = 1
+background_color = Color(0.16, 0.14, 0.21, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.58, 0.61, 0.72, 1)
+ambient_light_energy = 0.63
+fog_enabled = true
+fog_light_color = Color(0.28, 0.24, 0.36, 1)
+fog_density = 0.032
+
+[sub_resource type="StandardMaterial3D" id="Material_Ground"]
+albedo_color = Color(0.22, 0.27, 0.25, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Material_Paver"]
+albedo_color = Color(0.31, 0.35, 0.31, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Material_EdgePaver"]
+albedo_color = Color(0.27, 0.31, 0.28, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Material_Wall"]
+albedo_color = Color(0.24, 0.31, 0.29, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Material_Buttress"]
+albedo_color = Color(0.34, 0.38, 0.34, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Material_Seal"]
+albedo_color = Color(0.22, 0.19, 0.24, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Material_Statue"]
+albedo_color = Color(0.34, 0.39, 0.36, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Material_Bronze"]
+albedo_color = Color(0.55, 0.35, 0.18, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Material_Lamp"]
+albedo_color = Color(0.95, 0.63, 0.23, 1)
+roughness = 0.95
+emission_enabled = true
+emission = Color(1.0, 0.42, 0.08, 1)
+emission_energy_multiplier = 1.35
+
+[sub_resource type="BoxMesh" id="Mesh_Floor"]
+material = SubResource("Material_Ground")
+size = Vector3(18.0, 0.4, 22.0)
+
+[sub_resource type="BoxShape3D" id="Shape_Floor"]
+size = Vector3(18.0, 0.4, 22.0)
+
+[sub_resource type="BoxMesh" id="Mesh_BackWall"]
+material = SubResource("Material_Wall")
+size = Vector3(18.0, 4.1, 0.5)
+
+[sub_resource type="BoxShape3D" id="Shape_BackWall"]
+size = Vector3(18.0, 4.1, 0.5)
+
+[sub_resource type="BoxMesh" id="Mesh_SideWall"]
+material = SubResource("Material_Wall")
+size = Vector3(0.55, 5.3, 22.0)
+
+[sub_resource type="BoxShape3D" id="Shape_SideWall"]
+size = Vector3(0.55, 5.3, 22.0)
+
+[sub_resource type="BoxMesh" id="Mesh_FarWall"]
+material = SubResource("Material_Wall")
+size = Vector3(18.0, 6.9, 0.7)
+
+[sub_resource type="BoxShape3D" id="Shape_FarWall"]
+size = Vector3(18.0, 6.9, 0.7)
+
+[sub_resource type="BoxMesh" id="Mesh_Paver"]
+material = SubResource("Material_Paver")
+size = Vector3(2.4, 0.04, 1.36)
+
+[sub_resource type="BoxMesh" id="Mesh_EdgePaver"]
+material = SubResource("Material_EdgePaver")
+size = Vector3(1.05, 0.03, 1.36)
+
+[sub_resource type="BoxMesh" id="Mesh_Buttress"]
+material = SubResource("Material_Buttress")
+size = Vector3(1.15, 7.4, 1.25)
+
+[sub_resource type="BoxMesh" id="Mesh_ColumnFoot"]
+material = SubResource("Material_Wall")
+size = Vector3(1.5, 0.64, 1.58)
+
+[sub_resource type="BoxMesh" id="Mesh_ColumnBand"]
+material = SubResource("Material_Seal")
+size = Vector3(1.32, 0.24, 1.4)
+
+[sub_resource type="BoxMesh" id="Mesh_Gate"]
+material = SubResource("Material_Seal")
+size = Vector3(4.7, 4.65, 0.22)
+
+[sub_resource type="BoxMesh" id="Mesh_Lintel"]
+material = SubResource("Material_Buttress")
+size = Vector3(7.1, 0.56, 1.02)
+
+[sub_resource type="BoxMesh" id="Mesh_Pedestal"]
+material = SubResource("Material_Seal")
+size = Vector3(1.52, 0.2, 1.5)
+
+[sub_resource type="BoxMesh" id="Mesh_StatueBody"]
+material = SubResource("Material_Statue")
+size = Vector3(0.77, 0.98, 0.58)
+
+[sub_resource type="BoxMesh" id="Mesh_StatueArm"]
+material = SubResource("Material_Bronze")
+size = Vector3(0.22, 0.86, 0.28)
+
+[sub_resource type="BoxMesh" id="Mesh_StatueHead"]
+material = SubResource("Material_Statue")
+size = Vector3(0.42, 0.46, 0.42)
+
+[sub_resource type="BoxMesh" id="Mesh_StatueLeg"]
+material = SubResource("Material_Statue")
+size = Vector3(0.22, 0.42, 0.33)
+
+[sub_resource type="BoxMesh" id="Mesh_StatueVisor"]
+material = SubResource("Material_Lamp")
+size = Vector3(0.27, 0.075, 0.025)
+
+[sub_resource type="BoxMesh" id="Mesh_SconcePost"]
+material = SubResource("Material_Seal")
+size = Vector3(0.18, 1.08, 0.18)
+
+[sub_resource type="BoxMesh" id="Mesh_SconceFoot"]
+material = SubResource("Material_Buttress")
+size = Vector3(0.64, 0.21, 0.64)
+
+[sub_resource type="BoxMesh" id="Mesh_SconceTop"]
+material = SubResource("Material_Bronze")
+size = Vector3(0.36, 0.12, 0.36)
+
+[sub_resource type="BoxMesh" id="Mesh_SconceFlame"]
+material = SubResource("Material_Lamp")
+size = Vector3(0.2, 0.26, 0.2)
+
+[sub_resource type="BoxShape3D" id="Shape_SconceFoot"]
+size = Vector3(0.64, 0.21, 0.64)
+
+[sub_resource type="BoxShape3D" id="Shape_SconcePost"]
+size = Vector3(0.25, 1.46, 0.25)
+
+[sub_resource type="CapsuleShape3D" id="Shape_target"]
+radius = 0.56
+height = 2.10
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_controls"]
+content_margin_left = 15.0
+content_margin_top = 8.0
+content_margin_right = 15.0
+content_margin_bottom = 8.0
+bg_color = Color(0.065, 0.065, 0.085, 0.9)
+border_width_top = 1
+border_color = Color(0.53, 0.41, 0.29, 0.85)
+
+[node name="ControllerArena" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_court")
+
+[node name="Moon" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.85, -0.60, 0)
+light_color = Color(0.75, 0.81, 1, 1)
+light_energy = 0.95
+shadow_enabled = true
+
+[node name="Architecture" type="Node3D" parent="."]
+
+[node name="Floor" type="StaticBody3D" parent="Architecture"]
+position = Vector3(0, -0.2, -2)
+collision_mask = 0
+
+[node name="Stone" type="MeshInstance3D" parent="Architecture/Floor"]
+position = Vector3(0, 0, 0)
+mesh = SubResource("Mesh_Floor")
+
+[node name="Collision" type="CollisionShape3D" parent="Architecture/Floor"]
+shape = SubResource("Shape_Floor")
+
+[node name="RearWall" type="StaticBody3D" parent="Architecture"]
+position = Vector3(0, 2.05, 8.9)
+collision_mask = 0
+
+[node name="Stone" type="MeshInstance3D" parent="Architecture/RearWall"]
+position = Vector3(0, 0, 0)
+mesh = SubResource("Mesh_BackWall")
+
+[node name="Collision" type="CollisionShape3D" parent="Architecture/RearWall"]
+shape = SubResource("Shape_BackWall")
+
+[node name="WestWall" type="StaticBody3D" parent="Architecture"]
+position = Vector3(-8.73, 2.65, -2)
+collision_mask = 0
+
+[node name="Stone" type="MeshInstance3D" parent="Architecture/WestWall"]
+position = Vector3(0, 0, 0)
+mesh = SubResource("Mesh_SideWall")
+
+[node name="Collision" type="CollisionShape3D" parent="Architecture/WestWall"]
+shape = SubResource("Shape_SideWall")
+
+[node name="EastWall" type="StaticBody3D" parent="Architecture"]
+position = Vector3(8.73, 2.65, -2)
+collision_mask = 0
+
+[node name="Stone" type="MeshInstance3D" parent="Architecture/EastWall"]
+position = Vector3(0, 0, 0)
+mesh = SubResource("Mesh_SideWall")
+
+[node name="Collision" type="CollisionShape3D" parent="Architecture/EastWall"]
+shape = SubResource("Shape_SideWall")
+
+[node name="FarWall" type="StaticBody3D" parent="Architecture"]
+position = Vector3(0, 3.45, -12.65)
+collision_mask = 0
+
+[node name="Stone" type="MeshInstance3D" parent="Architecture/FarWall"]
+position = Vector3(0, 0, 0)
+mesh = SubResource("Mesh_FarWall")
+
+[node name="Collision" type="CollisionShape3D" parent="Architecture/FarWall"]
+shape = SubResource("Shape_FarWall")
+
+[node name="CenterPaver01" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(0, -0.018, -10)
+mesh = SubResource("Mesh_Paver")
+
+[node name="LeftPaver01" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-2.12, -0.012, -9.74)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="RightPaver01" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(2.12, -0.012, -9.74)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="CenterPaver02" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(0, -0.018, -8)
+mesh = SubResource("Mesh_Paver")
+
+[node name="LeftPaver02" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-2.12, -0.012, -7.74)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="RightPaver02" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(2.12, -0.012, -7.74)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="CenterPaver03" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(0, -0.018, -6)
+mesh = SubResource("Mesh_Paver")
+
+[node name="LeftPaver03" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-2.12, -0.012, -5.74)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="RightPaver03" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(2.12, -0.012, -5.74)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="CenterPaver04" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(0, -0.018, -4)
+mesh = SubResource("Mesh_Paver")
+
+[node name="LeftPaver04" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-2.12, -0.012, -3.74)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="RightPaver04" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(2.12, -0.012, -3.74)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="CenterPaver05" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(0, -0.018, -2)
+mesh = SubResource("Mesh_Paver")
+
+[node name="LeftPaver05" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-2.12, -0.012, -1.74)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="RightPaver05" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(2.12, -0.012, -1.74)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="CenterPaver06" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(0, -0.018, 0)
+mesh = SubResource("Mesh_Paver")
+
+[node name="LeftPaver06" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-2.12, -0.012, 0.26)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="RightPaver06" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(2.12, -0.012, 0.26)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="CenterPaver07" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(0, -0.018, 2)
+mesh = SubResource("Mesh_Paver")
+
+[node name="LeftPaver07" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-2.12, -0.012, 2.26)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="RightPaver07" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(2.12, -0.012, 2.26)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="CenterPaver08" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(0, -0.018, 4)
+mesh = SubResource("Mesh_Paver")
+
+[node name="LeftPaver08" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-2.12, -0.012, 4.26)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="RightPaver08" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(2.12, -0.012, 4.26)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="CenterPaver09" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(0, -0.018, 6)
+mesh = SubResource("Mesh_Paver")
+
+[node name="LeftPaver09" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-2.12, -0.012, 6.26)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="RightPaver09" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(2.12, -0.012, 6.26)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="CenterPaver10" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(0, -0.018, 8)
+mesh = SubResource("Mesh_Paver")
+
+[node name="LeftPaver10" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-2.12, -0.012, 8.26)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="RightPaver10" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(2.12, -0.012, 8.26)
+mesh = SubResource("Mesh_EdgePaver")
+
+[node name="Buttress1" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-2.85, 3.7, -12.12)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh_Buttress")
+
+[node name="Foot1" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-2.85, 0.32, -12.12)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh_ColumnFoot")
+
+[node name="Band1" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-2.85, 4.65, -12.12)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh_ColumnBand")
+
+[node name="Buttress2" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(2.85, 3.7, -12.12)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh_Buttress")
+
+[node name="Foot2" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(2.85, 0.32, -12.12)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh_ColumnFoot")
+
+[node name="Band2" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(2.85, 4.65, -12.12)
+rotation = Vector3(0, 0, 0)
+mesh = SubResource("Mesh_ColumnBand")
+
+[node name="Buttress3" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-8.87, 3.7, -8.8)
+rotation = Vector3(0, 1.57, 0)
+mesh = SubResource("Mesh_Buttress")
+
+[node name="Foot3" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-8.87, 0.32, -8.8)
+rotation = Vector3(0, 1.57, 0)
+mesh = SubResource("Mesh_ColumnFoot")
+
+[node name="Band3" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-8.87, 4.65, -8.8)
+rotation = Vector3(0, 1.57, 0)
+mesh = SubResource("Mesh_ColumnBand")
+
+[node name="Buttress4" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(8.87, 3.7, -8.8)
+rotation = Vector3(0, 1.57, 0)
+mesh = SubResource("Mesh_Buttress")
+
+[node name="Foot4" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(8.87, 0.32, -8.8)
+rotation = Vector3(0, 1.57, 0)
+mesh = SubResource("Mesh_ColumnFoot")
+
+[node name="Band4" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(8.87, 4.65, -8.8)
+rotation = Vector3(0, 1.57, 0)
+mesh = SubResource("Mesh_ColumnBand")
+
+[node name="Buttress5" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-8.87, 3.7, -2.4)
+rotation = Vector3(0, 1.57, 0)
+mesh = SubResource("Mesh_Buttress")
+
+[node name="Foot5" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-8.87, 0.32, -2.4)
+rotation = Vector3(0, 1.57, 0)
+mesh = SubResource("Mesh_ColumnFoot")
+
+[node name="Band5" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(-8.87, 4.65, -2.4)
+rotation = Vector3(0, 1.57, 0)
+mesh = SubResource("Mesh_ColumnBand")
+
+[node name="Buttress6" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(8.87, 3.7, -2.4)
+rotation = Vector3(0, 1.57, 0)
+mesh = SubResource("Mesh_Buttress")
+
+[node name="Foot6" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(8.87, 0.32, -2.4)
+rotation = Vector3(0, 1.57, 0)
+mesh = SubResource("Mesh_ColumnFoot")
+
+[node name="Band6" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(8.87, 4.65, -2.4)
+rotation = Vector3(0, 1.57, 0)
+mesh = SubResource("Mesh_ColumnBand")
+
+[node name="GateSeal" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(0, 2.34, -12.19)
+mesh = SubResource("Mesh_Gate")
+
+[node name="GateLintel" type="MeshInstance3D" parent="Architecture"]
+position = Vector3(0, 4.67, -12.15)
+mesh = SubResource("Mesh_Lintel")
+
+[node name="WestLantern" type="StaticBody3D" parent="."]
+position = Vector3(-3.65, 0, -6.1)
+collision_mask = 0
+
+[node name="FootCollision" type="CollisionShape3D" parent="WestLantern"]
+position = Vector3(0, 0.105, 0)
+shape = SubResource("Shape_SconceFoot")
+
+[node name="PostCollision" type="CollisionShape3D" parent="WestLantern"]
+position = Vector3(0, 0.94, 0)
+shape = SubResource("Shape_SconcePost")
+
+[node name="Foot" type="MeshInstance3D" parent="WestLantern"]
+position = Vector3(0, 0.105, 0)
+mesh = SubResource("Mesh_SconceFoot")
+
+[node name="Post" type="MeshInstance3D" parent="WestLantern"]
+position = Vector3(0, 0.65, 0)
+mesh = SubResource("Mesh_SconcePost")
+
+[node name="LowerCap" type="MeshInstance3D" parent="WestLantern"]
+position = Vector3(0, 1.22, 0)
+mesh = SubResource("Mesh_SconceTop")
+
+[node name="UpperCap" type="MeshInstance3D" parent="WestLantern"]
+position = Vector3(0, 1.61, 0)
+mesh = SubResource("Mesh_SconceTop")
+
+[node name="Flame" type="MeshInstance3D" parent="WestLantern"]
+position = Vector3(0, 1.42, 0)
+rotation = Vector3(0, 0.785, 0)
+mesh = SubResource("Mesh_SconceFlame")
+
+[node name="Light" type="OmniLight3D" parent="WestLantern"]
+position = Vector3(0, 1.49, 0.1)
+light_color = Color(1, 0.58, 0.26, 1)
+light_energy = 2.1
+omni_range = 7.5
+
+[node name="EastLantern" type="StaticBody3D" parent="."]
+position = Vector3(3.65, 0, -6.1)
+collision_mask = 0
+
+[node name="FootCollision" type="CollisionShape3D" parent="EastLantern"]
+position = Vector3(0, 0.105, 0)
+shape = SubResource("Shape_SconceFoot")
+
+[node name="PostCollision" type="CollisionShape3D" parent="EastLantern"]
+position = Vector3(0, 0.94, 0)
+shape = SubResource("Shape_SconcePost")
+
+[node name="Foot" type="MeshInstance3D" parent="EastLantern"]
+position = Vector3(0, 0.105, 0)
+mesh = SubResource("Mesh_SconceFoot")
+
+[node name="Post" type="MeshInstance3D" parent="EastLantern"]
+position = Vector3(0, 0.65, 0)
+mesh = SubResource("Mesh_SconcePost")
+
+[node name="LowerCap" type="MeshInstance3D" parent="EastLantern"]
+position = Vector3(0, 1.22, 0)
+mesh = SubResource("Mesh_SconceTop")
+
+[node name="UpperCap" type="MeshInstance3D" parent="EastLantern"]
+position = Vector3(0, 1.61, 0)
+mesh = SubResource("Mesh_SconceTop")
+
+[node name="Flame" type="MeshInstance3D" parent="EastLantern"]
+position = Vector3(0, 1.42, 0)
+rotation = Vector3(0, 0.785, 0)
+mesh = SubResource("Mesh_SconceFlame")
+
+[node name="Light" type="OmniLight3D" parent="EastLantern"]
+position = Vector3(0, 1.49, 0.1)
+light_color = Color(1, 0.58, 0.26, 1)
+light_energy = 2.1
+omni_range = 7.5
+
+[node name="Target" type="StaticBody3D" parent="."]
+position = Vector3(0, 0, -4)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Collision" type="CollisionShape3D" parent="Target"]
+position = Vector3(0, 1.05, 0)
+shape = SubResource("Shape_target")
+
+[node name="Pedestal" type="MeshInstance3D" parent="Target"]
+position = Vector3(0, 0.1, 0)
+mesh = SubResource("Mesh_Pedestal")
+
+[node name="LeftLeg" type="MeshInstance3D" parent="Target"]
+position = Vector3(-0.2, 0.41, 0)
+mesh = SubResource("Mesh_StatueLeg")
+
+[node name="LeftArm" type="MeshInstance3D" parent="Target"]
+position = Vector3(-0.49, 0.99, 0)
+rotation = Vector3(0, 0, -0.11)
+mesh = SubResource("Mesh_StatueArm")
+
+[node name="RightLeg" type="MeshInstance3D" parent="Target"]
+position = Vector3(0.2, 0.41, 0)
+mesh = SubResource("Mesh_StatueLeg")
+
+[node name="RightArm" type="MeshInstance3D" parent="Target"]
+position = Vector3(0.49, 0.99, 0)
+rotation = Vector3(0, 0, 0.11)
+mesh = SubResource("Mesh_StatueArm")
+
+[node name="Torso" type="MeshInstance3D" parent="Target"]
+position = Vector3(0, 1.05, 0)
+mesh = SubResource("Mesh_StatueBody")
+
+[node name="Head" type="MeshInstance3D" parent="Target"]
+position = Vector3(0, 1.71, 0)
+mesh = SubResource("Mesh_StatueHead")
+
+[node name="Visor" type="MeshInstance3D" parent="Target"]
+position = Vector3(0, 1.74, 0.215)
+mesh = SubResource("Mesh_StatueVisor")
+
+[node name="LockPoint" type="Marker3D" parent="Target" groups=["lock_targets"]]
+position = Vector3(0, 1.38, 0)
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+position = Vector3(0, 0.03, 3.65)
+
+[node name="Interface" type="CanvasLayer" parent="."]
+
+[node name="Controls" type="MarginContainer" parent="Interface"]
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_bottom = 18
+
+[node name="Panel" type="PanelContainer" parent="Interface/Controls"]
+layout_mode = 2
+size_flags_horizontal = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBox_controls")
+
+[node name="Bindings" type="Label" parent="Interface/Controls/Panel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.86, 0.8, 1)
+theme_override_font_sizes/font_size = 15
+text = "WASD / Left stick   Move     ·     Mouse / Right stick   Look     ·     MMB / R3   Lock on     ·     Esc   Release cursor"

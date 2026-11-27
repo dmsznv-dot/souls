@@ -1,0 +1,4 @@
+# Game development skills
+
+Project-local copies from https://github.com/gamedev-skills/awesome-gamedev-agent-skills
+at commit `c6ca6c41c839b68319ffc08430b99ab768debc32`. See LICENSE and NOTICE.

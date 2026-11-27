@@ -1,0 +1,282 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/duel/courtyard_duel.gd" id="1_duel"]
+[ext_resource type="PackedScene" path="res://scenes/duel/environment/courtyard_environment.tscn" id="2_court"]
+[ext_resource type="PackedScene" path="res://scenes/duel/duel_player.tscn" id="3_player"]
+[ext_resource type="PackedScene" path="res://scenes/duel/guard.tscn" id="4_guard"]
+[ext_resource type="PackedScene" path="res://scenes/duel/audio/duel_audio.tscn" id="5_audio"]
+
+[sub_resource type="StyleBoxFlat" id="Track"]
+bg_color = Color(0.05, 0.058, 0.065, 0.92)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_left = 2
+corner_radius_bottom_right = 2
+
+[sub_resource type="StyleBoxFlat" id="HeroFill"]
+bg_color = Color(0.65, 0.28, 0.23, 1)
+
+[sub_resource type="StyleBoxFlat" id="StaminaFill"]
+bg_color = Color(0.39, 0.73, 0.58, 1)
+
+[sub_resource type="StyleBoxFlat" id="GuardFill"]
+bg_color = Color(0.71, 0.36, 0.24, 1)
+
+[sub_resource type="StyleBoxFlat" id="PostureFill"]
+bg_color = Color(0.82, 0.59, 0.31, 1)
+
+[sub_resource type="StyleBoxFlat" id="Panel"]
+bg_color = Color(0.048, 0.054, 0.061, 0.93)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.61, 0.49, 0.33, 0.92)
+content_margin_left = 14.0
+content_margin_top = 8.0
+content_margin_right = 14.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="ResultsPanel"]
+bg_color = Color(0.052, 0.059, 0.066, 0.94)
+border_width_top = 2
+border_width_bottom = 2
+border_color = Color(0.82, 0.61, 0.36, 1)
+content_margin_left = 56.0
+content_margin_top = 26.0
+content_margin_right = 56.0
+content_margin_bottom = 26.0
+
+[sub_resource type="StandardMaterial3D" id="ArcMaterial"]
+shading_mode = 0
+vertex_color_use_as_albedo = true
+
+[sub_resource type="ImmediateMesh" id="HeroArc"]
+
+[sub_resource type="ImmediateMesh" id="GuardArc"]
+
+[node name="CourtyardDuel" type="Node3D"]
+script = ExtResource("1_duel")
+
+[node name="Environment" parent="." instance=ExtResource("2_court")]
+
+[node name="Player" parent="." instance=ExtResource("3_player")]
+position = Vector3(0, 0.025, 3.65)
+
+[node name="Guard" parent="." node_paths=PackedStringArray("player") instance=ExtResource("4_guard")]
+position = Vector3(0, 0.02, -4)
+player = NodePath("../Player")
+
+[node name="Audio" parent="." instance=ExtResource("5_audio")]
+
+[node name="HeroArc" type="MeshInstance3D" parent="."]
+visible = false
+cast_shadow = 0
+material_override = SubResource("ArcMaterial")
+mesh = SubResource("HeroArc")
+
+[node name="GuardArc" type="MeshInstance3D" parent="."]
+visible = false
+cast_shadow = 0
+material_override = SubResource("ArcMaterial")
+mesh = SubResource("GuardArc")
+
+[node name="Interface" type="CanvasLayer" parent="."]
+
+[node name="HeroMeters" type="VBoxContainer" parent="Interface"]
+offset_left = 27.0
+offset_top = 24.0
+offset_right = 242.0
+offset_bottom = 81.0
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="GuardMeters" type="VBoxContainer" parent="Interface"]
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -150.0
+offset_top = 22.0
+offset_right = 150.0
+offset_bottom = 80.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="Caption" type="Label" parent="Interface/HeroMeters"]
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.91, 0.81, 1)
+theme_override_colors/font_shadow_color = Color(0.035, 0.034, 0.044, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 14
+text = "VITALITY  /  STAMINA"
+horizontal_alignment = 0
+
+[node name="PlayerHP" type="ProgressBar" parent="Interface/HeroMeters"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 10)
+mouse_filter = 2
+theme_override_styles/background = SubResource("Track")
+theme_override_styles/fill = SubResource("HeroFill")
+value = 100.0
+show_percentage = false
+accessibility_name = "Player health"
+
+[node name="Stamina" type="ProgressBar" parent="Interface/HeroMeters"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 7)
+mouse_filter = 2
+theme_override_styles/background = SubResource("Track")
+theme_override_styles/fill = SubResource("StaminaFill")
+value = 100.0
+show_percentage = false
+accessibility_name = "Player stamina"
+
+[node name="Caption" type="Label" parent="Interface/GuardMeters"]
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.91, 0.81, 1)
+theme_override_colors/font_shadow_color = Color(0.035, 0.034, 0.044, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 17
+text = "THE GATE WATCHER"
+horizontal_alignment = 1
+
+[node name="GuardHP" type="ProgressBar" parent="Interface/GuardMeters"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 9)
+mouse_filter = 2
+theme_override_styles/background = SubResource("Track")
+theme_override_styles/fill = SubResource("GuardFill")
+value = 100.0
+show_percentage = false
+accessibility_name = "Watcher health"
+
+[node name="Posture" type="ProgressBar" parent="Interface/GuardMeters"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 4)
+mouse_filter = 2
+theme_override_styles/background = SubResource("Track")
+theme_override_styles/fill = SubResource("PostureFill")
+value = 100.0
+show_percentage = false
+accessibility_name = "Watcher posture"
+
+[node name="Bindings" type="PanelContainer" parent="Interface"]
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = -426.0
+offset_top = -64.0
+offset_right = 426.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("Panel")
+
+[node name="Keys" type="VBoxContainer" parent="Interface/Bindings"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Combat" type="Label" parent="Interface/Bindings/Keys"]
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.91, 0.81, 1)
+theme_override_colors/font_shadow_color = Color(0.035, 0.034, 0.044, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 15
+text = "WASD  Move   ·   LMB  Slash   ·   R  Heavy   ·   RMB  Block   ·   Q  Parry   ·   Space  Dodge   ·   MMB  Lock"
+horizontal_alignment = 1
+
+[node name="Other" type="Label" parent="Interface/Bindings/Keys"]
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.91, 0.81, 1)
+theme_override_colors/font_shadow_color = Color(0.035, 0.034, 0.044, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 12
+text = "Xbox    LS / RS  Move / Look   ·   RB / RT  Attacks   ·   LB  Block   ·   LT  Parry   ·   B  Dodge   ·   R3  Lock    |    T / Menu  Retry   ·   F2  Debug"
+horizontal_alignment = 1
+
+[node name="Notice" type="Label" parent="Interface"]
+unique_name_in_owner = true
+visible = false
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = -190.0
+offset_right = 190.0
+offset_top = -123.0
+offset_bottom = -85.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.91, 0.81, 1)
+theme_override_colors/font_shadow_color = Color(0.035, 0.034, 0.044, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 21
+text = ""
+horizontal_alignment = 1
+
+[node name="Debug" type="Label" parent="Interface"]
+unique_name_in_owner = true
+visible = false
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -290.0
+offset_right = 290.0
+offset_top = 88.0
+offset_bottom = 111.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.91, 0.81, 1)
+theme_override_colors/font_shadow_color = Color(0.035, 0.034, 0.044, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 15
+text = ""
+horizontal_alignment = 1
+
+[node name="Result" type="PanelContainer" parent="Interface"]
+unique_name_in_owner = true
+visible = false
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = -230.0
+offset_right = 230.0
+offset_top = -62.0
+offset_bottom = 62.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("ResultsPanel")
+
+[node name="Messages" type="VBoxContainer" parent="Interface/Result"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="ResultTitle" type="Label" parent="Interface/Result/Messages"]
+unique_name_in_owner = true
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.91, 0.81, 1)
+theme_override_colors/font_shadow_color = Color(0.035, 0.034, 0.044, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 35
+text = ""
+horizontal_alignment = 1
+
+[node name="Retry" type="Label" parent="Interface/Result/Messages"]
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.91, 0.81, 1)
+theme_override_colors/font_shadow_color = Color(0.035, 0.034, 0.044, 0.95)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 17
+text = "T / Menu   Begin again"
+horizontal_alignment = 1

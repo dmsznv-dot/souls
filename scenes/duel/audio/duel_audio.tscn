@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/duel/audio/duel_audio.gd" id="1_audio"]
+
+[node name="DuelAudio" type="Node3D"]
+script = ExtResource("1_audio")

@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/duel/guard.gd" id="1_guard"]
+[ext_resource type="PackedScene" path="res://scenes/characters/duelist_rig.tscn" id="2_rig"]
+[ext_resource type="Script" path="res://scenes/duel/combat/combatant.gd" id="3_combat"]
+[ext_resource type="Resource" path="res://scenes/duel/combat/guard_slash.tres" id="4_slash"]
+[ext_resource type="Resource" path="res://scenes/duel/combat/guard_thrust.tres" id="5_thrust"]
+
+[sub_resource type="CapsuleShape3D" id="Capsule"]
+radius = 0.43
+height = 1.93
+
+[node name="Guard" type="CharacterBody3D"]
+collision_layer = 4
+collision_mask = 3
+script = ExtResource("1_guard")
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+position = Vector3(0, 0.965, 0)
+shape = SubResource("Capsule")
+
+[node name="Heading" type="Node3D" parent="."]
+rotation = Vector3(0, 3.14159, 0)
+
+[node name="Rig" parent="Heading" instance=ExtResource("2_rig")]
+scale = Vector3(1.07, 1.07, 1.07)
+guard_variant = true
+
+[node name="LockPoint" type="Marker3D" parent="." groups=["lock_targets"]]
+position = Vector3(0, 1.38, 0)
+
+[node name="Navigation" type="NavigationAgent3D" parent="."]
+path_desired_distance = 0.19
+target_desired_distance = 0.4
+
+[node name="Combat" type="Node" parent="."]
+script = ExtResource("3_combat")
+light_attack = ExtResource("4_slash")
+heavy_attack = ExtResource("5_thrust")
+opponent_mask = 2

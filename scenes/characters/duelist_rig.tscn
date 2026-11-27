@@ -1,0 +1,188 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/characters/duelist_rig.gd" id="1"]
+
+[node name="DuelistRig" type="Node3D"]
+script = ExtResource("1")
+
+[node name="Skeleton3D" type="Skeleton3D" parent="."]
+scale = Vector3(1.10, 1.10, 1.10)
+bones/0/name = "Pelvis"
+bones/0/parent = -1
+bones/0/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.82, 0)
+bones/0/enabled = true
+bones/0/position = Vector3(0, 0.82, 0)
+bones/0/rotation = Quaternion(0, 0, 0, 1)
+bones/0/scale = Vector3(1, 1, 1)
+bones/1/name = "Chest"
+bones/1/parent = 0
+bones/1/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.14, 0)
+bones/1/enabled = true
+bones/1/position = Vector3(0, 0.14, 0)
+bones/1/rotation = Quaternion(0, 0, 0, 1)
+bones/1/scale = Vector3(1, 1, 1)
+bones/2/name = "Head"
+bones/2/parent = 1
+bones/2/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
+bones/2/enabled = true
+bones/2/position = Vector3(0, 0.32, 0)
+bones/2/rotation = Quaternion(0, 0, 0, 1)
+bones/2/scale = Vector3(1, 1, 1)
+bones/3/name = "Cape"
+bones/3/parent = 1
+bones/3/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0.08)
+bones/3/enabled = true
+bones/3/position = Vector3(0, 0.25, 0.08)
+bones/3/rotation = Quaternion(0, 0, 0, 1)
+bones/3/scale = Vector3(1, 1, 1)
+bones/4/name = "ThighL"
+bones/4/parent = 0
+bones/4/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.122, -0.018, 0.0)
+bones/4/enabled = true
+bones/4/position = Vector3(-0.122, -0.018, 0.0)
+bones/4/rotation = Quaternion(0, 0, 0, 1)
+bones/4/scale = Vector3(1, 1, 1)
+bones/5/name = "ShinL"
+bones/5/parent = 4
+bones/5/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.38, 0)
+bones/5/enabled = true
+bones/5/position = Vector3(0, -0.38, 0)
+bones/5/rotation = Quaternion(0, 0, 0, 1)
+bones/5/scale = Vector3(1, 1, 1)
+bones/6/name = "FootL"
+bones/6/parent = 5
+bones/6/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.344, 0)
+bones/6/enabled = true
+bones/6/position = Vector3(0, -0.344, 0)
+bones/6/rotation = Quaternion(0, 0, 0, 1)
+bones/6/scale = Vector3(1, 1, 1)
+bones/7/name = "ArmL"
+bones/7/parent = 1
+bones/7/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.259, 0.22, 0)
+bones/7/enabled = true
+bones/7/position = Vector3(-0.259, 0.22, 0)
+bones/7/rotation = Quaternion(0, 0, 0, 1)
+bones/7/scale = Vector3(1, 1, 1)
+bones/8/name = "ElbowL"
+bones/8/parent = 7
+bones/8/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.259, 0)
+bones/8/enabled = true
+bones/8/position = Vector3(0, -0.259, 0)
+bones/8/rotation = Quaternion(0, 0, 0, 1)
+bones/8/scale = Vector3(1, 1, 1)
+bones/9/name = "HandL"
+bones/9/parent = 8
+bones/9/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.217, 0)
+bones/9/enabled = true
+bones/9/position = Vector3(0, -0.217, 0)
+bones/9/rotation = Quaternion(0, 0, 0, 1)
+bones/9/scale = Vector3(1, 1, 1)
+bones/10/name = "ThighR"
+bones/10/parent = 0
+bones/10/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.122, -0.018, 0.0)
+bones/10/enabled = true
+bones/10/position = Vector3(0.122, -0.018, 0.0)
+bones/10/rotation = Quaternion(0, 0, 0, 1)
+bones/10/scale = Vector3(1, 1, 1)
+bones/11/name = "ShinR"
+bones/11/parent = 10
+bones/11/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.38, 0)
+bones/11/enabled = true
+bones/11/position = Vector3(0, -0.38, 0)
+bones/11/rotation = Quaternion(0, 0, 0, 1)
+bones/11/scale = Vector3(1, 1, 1)
+bones/12/name = "FootR"
+bones/12/parent = 11
+bones/12/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.344, 0)
+bones/12/enabled = true
+bones/12/position = Vector3(0, -0.344, 0)
+bones/12/rotation = Quaternion(0, 0, 0, 1)
+bones/12/scale = Vector3(1, 1, 1)
+bones/13/name = "ArmR"
+bones/13/parent = 1
+bones/13/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.259, 0.22, 0)
+bones/13/enabled = true
+bones/13/position = Vector3(0.259, 0.22, 0)
+bones/13/rotation = Quaternion(0, 0, 0, 1)
+bones/13/scale = Vector3(1, 1, 1)
+bones/14/name = "ElbowR"
+bones/14/parent = 13
+bones/14/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.259, 0)
+bones/14/enabled = true
+bones/14/position = Vector3(0, -0.259, 0)
+bones/14/rotation = Quaternion(0, 0, 0, 1)
+bones/14/scale = Vector3(1, 1, 1)
+bones/15/name = "HandR"
+bones/15/parent = 14
+bones/15/rest = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.217, 0)
+bones/15/enabled = true
+bones/15/position = Vector3(0, -0.217, 0)
+bones/15/rotation = Quaternion(0, 0, 0, 1)
+bones/15/scale = Vector3(1, 1, 1)
+
+[node name="Pelvis" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "Pelvis"
+bone_idx = 0
+
+[node name="Chest" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "Chest"
+bone_idx = 1
+
+[node name="Head" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "Head"
+bone_idx = 2
+
+[node name="Cape" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "Cape"
+bone_idx = 3
+
+[node name="ThighL" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "ThighL"
+bone_idx = 4
+
+[node name="ShinL" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "ShinL"
+bone_idx = 5
+
+[node name="FootL" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "FootL"
+bone_idx = 6
+
+[node name="ArmL" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "ArmL"
+bone_idx = 7
+
+[node name="ElbowL" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "ElbowL"
+bone_idx = 8
+
+[node name="HandL" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "HandL"
+bone_idx = 9
+
+[node name="ThighR" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "ThighR"
+bone_idx = 10
+
+[node name="ShinR" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "ShinR"
+bone_idx = 11
+
+[node name="FootR" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "FootR"
+bone_idx = 12
+
+[node name="ArmR" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "ArmR"
+bone_idx = 13
+
+[node name="ElbowR" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "ElbowR"
+bone_idx = 14
+
+[node name="HandR" type="BoneAttachment3D" parent="Skeleton3D"]
+bone_name = "HandR"
+bone_idx = 15
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+callback_mode_process = 2

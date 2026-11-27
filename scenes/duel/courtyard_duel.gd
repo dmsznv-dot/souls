@@ -1,0 +1,138 @@
+extends Node3D
+
+const Combatant = preload("res://scenes/duel/combat/combatant.gd")
+
+var outcome: StringName
+var _debug_enabled: bool
+var _notice_time: float
+var _reset_requested: bool
+
+@onready var _hero: Combatant = $Player/Combat
+@onready var _guard: Combatant = $Guard/Combat
+@onready var _audio: Node3D = $Audio
+@onready var _player_hp: ProgressBar = %PlayerHP
+@onready var _stamina: ProgressBar = %Stamina
+@onready var _guard_hp: ProgressBar = %GuardHP
+@onready var _posture: ProgressBar = %Posture
+@onready var _notice: Label = %Notice
+@onready var _debug: Label = %Debug
+@onready var _result: PanelContainer = %Result
+@onready var _result_title: Label = %ResultTitle
+@onready var _hero_arc: MeshInstance3D = $HeroArc
+@onready var _guard_arc: MeshInstance3D = $GuardArc
+
+
+func _ready() -> void:
+	_hero.feedback.connect(_on_feedback)
+	_guard.feedback.connect(_on_feedback)
+	_hero.defeated.connect(_finish.bind(&"defeat"))
+	_guard.defeated.connect(_finish.bind(&"victory"))
+
+
+func _process(delta: float) -> void:
+	_player_hp.value = _hero.health
+	_stamina.value = _hero.stamina
+	_guard_hp.value = _guard.health
+	_posture.value = _guard.posture
+	_notice_time = maxf(0.0, _notice_time - delta)
+	_notice.visible = _notice_time > 0.0
+	_stamina.self_modulate = Color(1.0, 0.64, 0.54) if _notice.visible and _notice.text == "Out of stamina" else Color.WHITE
+	if _debug_enabled:
+		_debug.text = "Hero  %s   |   Watcher  %s   |   Buffer  %s" % [
+			_hero.phase_name(), _guard.phase_name(), $Player.buffer_status()]
+		_draw_attack(_hero, _hero_arc)
+		_draw_attack(_guard, _guard_arc)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"restart_duel") and not _reset_requested:
+		_reset_requested = true
+		get_tree().reload_current_scene.call_deferred()
+	elif event.is_action_pressed(&"combat_debug"):
+		_debug_enabled = not _debug_enabled
+		_debug.visible = _debug_enabled
+		_hero_arc.visible = _debug_enabled
+		_guard_arc.visible = _debug_enabled
+
+
+func _finish(result: StringName) -> void:
+	if outcome != &"":
+		return
+	outcome = result
+	$Player.can_fight = false
+	$Guard.ai_enabled = false
+	if result == &"victory":
+		$Guard/LockPoint.hide()
+		$Guard.set_deferred("collision_layer", 0)
+		$Guard.set_deferred("collision_mask", 1)
+	var fallen := _guard if result == &"victory" else _hero
+	_audio.play_cue(result, fallen.body.global_position)
+	_result_title.text = "WATCHER DEFEATED" if result == &"victory" else "YOU FELL"
+	get_tree().create_timer(0.52).timeout.connect(_result.show)
+
+
+func _on_feedback(cue: StringName, location: Vector3) -> void:
+	_audio.play_cue(cue, location)
+	match cue:
+		&"tired":
+			_show_notice("Out of stamina")
+		&"parry":
+			_show_notice("Parried  ·  Counter now")
+			_sparks(location, Color(0.56, 0.95, 0.98), 18)
+		&"guard_break":
+			_show_notice("Guard broken")
+			_sparks(location, Color(1.0, 0.50, 0.26), 14)
+		&"block":
+			_sparks(location, Color(1.0, 0.80, 0.41), 9)
+		&"hit":
+			_sparks(location, Color(1.0, 0.64, 0.42), 7)
+
+
+func _show_notice(message: String) -> void:
+	_notice.text = message
+	_notice_time = 0.85
+
+
+func _sparks(location: Vector3, color: Color, count: int) -> void:
+	var particle := CPUParticles3D.new()
+	var dot := BoxMesh.new()
+	dot.size = Vector3(0.045, 0.072, 0.045)
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.albedo_color = color
+	dot.material = glow
+	particle.mesh = dot
+	particle.amount = count
+	particle.lifetime = 0.31
+	particle.one_shot = true
+	particle.explosiveness = 0.98
+	particle.spread = 130.0
+	particle.direction = Vector3.UP
+	particle.gravity = Vector3(0.0, -8.0, 0.0)
+	particle.initial_velocity_min = 2.3
+	particle.initial_velocity_max = 4.8
+	particle.emitting = false
+	add_child(particle)
+	particle.global_position = location
+	particle.emitting = true
+	get_tree().create_timer(0.42).timeout.connect(particle.queue_free)
+
+
+func _draw_attack(actor: Combatant, instance: MeshInstance3D) -> void:
+	var mesh := instance.mesh as ImmediateMesh
+	mesh.clear_surfaces()
+	var attack := actor.attack
+	if attack == null:
+		return
+	var start := actor.body.global_position + Vector3.UP * 0.08
+	var forward := -actor.heading.global_basis.z
+	var half_arc := deg_to_rad(attack.arc / 2.0)
+	var tint := Color(0.46, 0.92, 0.69) if actor.lunge_speed() > 0.0 else Color(0.96, 0.69, 0.32)
+	mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, instance.material_override)
+	mesh.surface_set_color(tint)
+	mesh.surface_add_vertex(to_local(start))
+	for step in range(25):
+		var angle := lerpf(-half_arc, half_arc, float(step) / 24.0)
+		mesh.surface_add_vertex(to_local(start + forward.rotated(Vector3.UP, angle) * attack.reach))
+	mesh.surface_add_vertex(to_local(start))
+	mesh.surface_end()
