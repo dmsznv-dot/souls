@@ -42,7 +42,7 @@ func engaged() -> bool:
 
 
 func caption(enemy: Node) -> String:
-	return CAPTIONS.get(enemy.role, "")
+	return enemy.title if not enemy.title.is_empty() else CAPTIONS.get(enemy.role, "")
 
 
 func entrance_transform() -> Transform3D:

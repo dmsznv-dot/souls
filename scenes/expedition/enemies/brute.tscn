@@ -1,0 +1,41 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/duel/guard.tscn" id="1_guard"]
+[ext_resource type="Resource" path="res://scenes/expedition/enemies/brute_hook.tres" id="2"]
+[ext_resource type="Resource" path="res://scenes/expedition/enemies/brute_slam.tres" id="3"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/brute_growth.tres" id="4"]
+
+[sub_resource type="CapsuleShape3D" id="Body"]
+radius = 0.6
+height = 2.6
+
+[node name="Brute" instance=ExtResource("1_guard")]
+collision_mask = 7
+role = &"brute"
+title = "ASHBOUND BRUTE"
+pursuit_speed = 1.9
+notice_distance = 7.0
+acceleration = 6.0
+deceleration = 5.0
+turn_rate = 3.5
+attack_rest = 0.9
+
+[node name="Collision" parent="." index="0"]
+position = Vector3(0, 1.3, 0)
+shape = SubResource("Body")
+
+[node name="Rig" parent="Heading" index="0"]
+scale = Vector3(1.4, 1.4, 1.4)
+creature = 3
+body_style = 4
+weapon = ExtResource("4")
+
+[node name="LockPoint" parent="." index="2"]
+position = Vector3(0, 1.95, 0)
+
+[node name="Combat" parent="." index="4"]
+light_attack = ExtResource("2")
+heavy_attack = ExtResource("3")
+max_health = 170.0
+flinch_scale = 0.4
+armor = &"hide"

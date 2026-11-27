@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="DuelAttack" format=3]
+
+[ext_resource type="Script" path="res://scenes/duel/combat/attack_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+clip = &"leap_slam"
+windup = 0.9
+active = 0.16
+recovery = 1.0
+damage = 34.0
+block_cost = 45.0
+posture_damage = 48.0
+reach = 8.5
+arc = 110.0
+lunge_speed = 0.0
+impact = 1.0
+leap = 7.0
+shockwave_radius = 2.6
+shockwave_offset = 1.0
+hyper_armor = true
+stamina_cost = 0.0
+chain_point = 0.3
+roll_cancel_point = 0.55

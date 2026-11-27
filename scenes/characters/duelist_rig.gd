@@ -4,7 +4,7 @@ extends Node3D
 ## The Skeleton body style dresses the same rig as an armoured low-poly skeleton.
 @export var guard_variant := false
 @export_enum("Sword", "Spear", "Javelin", "SwordShield") var equipment: int = 0
-@export_enum("Duelist", "Skeleton") var body_style: int = 0
+@export_enum("Duelist", "Skeleton", "Husk", "Ghoul", "Brute") var body_style: int = 0
 ## Held weapon. When empty, the equipment slot picks the matching default.
 @export var weapon: SoulsWeapon
 ## Body plan and gait family: how it stands, walks, runs and which clips its actions use.
@@ -130,13 +130,20 @@ func _ready() -> void:
 	bone = _material("d8cfb4")
 	bone.roughness = 0.88
 	void_black = _material("0b0a0d")
-	if body_style == 1:
-		cloth = _material("1f4a4c")
-		iron = _material("767b82", 0.5)
-		trim = _material("8a6a3c", 0.4)
-		_dress_skeleton()
-	else:
-		_dress()
+	match body_style:
+		1:
+			cloth = _material("5a2a26" if guard_variant else "1f4a4c")
+			iron = _material("767b82", 0.5)
+			trim = _material("8a6a3c", 0.4)
+			_dress_skeleton()
+		2:
+			_dress_husk()
+		3:
+			_dress_ghoul()
+		4:
+			_dress_brute()
+		_:
+			_dress()
 	_steps = AudioStreamPlayer3D.new()
 	_steps.name = "Steps"
 	var takes := AudioStreamRandomizer.new()
@@ -351,6 +358,103 @@ func _dress_skeleton() -> void:
 	_loft("Head","KettleHelm",iron,[Vector4(.13,.128,.138,.005),Vector4(.2,.125,.135,.008),
 			Vector4(.275,.07,.08,.012),Vector4(.3,.02,.02,.012)],8)
 	_loft("Head","HelmBrim",rusted,[Vector4(.125,.2,.21,.01),Vector4(.145,.19,.2,.01)],8)
+	if equipment == 3:
+		_loft("ElbowL","Shield",rusted,[Vector4(-.45,.026,.034,0),Vector4(-.28,.185,.056,0),
+				Vector4(.085,.221,.063,0),Vector4(.155,.171,.055,0)],6,Vector3(-.065,-.065,-.09))
+		_box("ElbowL","ShieldBoss",Vector3(.07,.07,.04),iron,Vector3(-.065,-.17,-.16))
+
+## Tapered limb along -Y from a joint: (length, top radius, bottom radius).
+func _limb(joint: String, label: String, mat: Material, length: float, top: float, bottom: float,
+		sides := 6, offset := Vector3.ZERO) -> MeshInstance3D:
+	return _loft(joint, label, mat, [Vector4(-length, bottom, bottom, 0), Vector4(-length * 0.5, (top + bottom) * 0.55, (top + bottom) * 0.5, 0),
+			Vector4(0.02, top, top, 0)], sides, offset)
+
+func _ember() -> StandardMaterial3D:
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.albedo_color = Color(1.0, 0.48, 0.18)
+	return glow
+
+## Ash Husk: a burned corpse walking, ember cracks under grey skin, rags, a hanging jaw.
+func _dress_husk() -> void:
+	var skin := _material("6b7461")
+	var rags := _material("4a3a30")
+	var glow := _ember()
+	_loft("Pelvis","Hips",skin,[Vector4(-.08,.15,.1,0),Vector4(.08,.16,.1,0)],6)
+	_loft("Pelvis","Rags",rags,[Vector4(-.3,.2,.14,.01),Vector4(-.02,.17,.12,0),Vector4(.08,.16,.11,0)],5)
+	_loft("Chest","Torso",skin,[Vector4(-.1,.15,.11,0),Vector4(.1,.2,.13,.01),Vector4(.26,.17,.11,.02)],6)
+	for i in 3:
+		_box("Chest","Rib%d" % i,Vector3(.11,.018,.03),bone,Vector3(-.09,.02 + i * .05,-.12))
+	for k in 5:
+		_box("Chest","Crack%d" % k,Vector3(.02,.07,.01),glow,Vector3(-.06 + k * .045,.06 + (k % 2) * .06,-.128),Vector3(0,0,20 - k * 9))
+	_loft("Head","Skull",skin,[Vector4(-.02,.09,.1,0),Vector4(.1,.11,.12,0),Vector4(.2,.08,.09,.01)],6)
+	for side in [-1.0, 1.0]:
+		_box("Head","Socket",Vector3(.045,.035,.02),void_black,Vector3(side * .04,.09,-.11))
+		_box("Head","Ember",Vector3(.012,.012,.01),glow,Vector3(side * .04,.088,-.122))
+	_jaw = Node3D.new()
+	skeleton.get_node("Head").add_child(_jaw)
+	_jaw.position = Vector3(0,.03,-.02)
+	_box("Head","Jaw",Vector3(.1,.03,.09),skin,Vector3(0,-.03,-.06),Vector3.ZERO,_jaw)
+	for i in 3:
+		_box("Cape","Tatter%d" % i,Vector3(.12,.4 + i * .08,.015),rags,Vector3(-.12 + i * .12,-.2,.14),Vector3(5,0,(i - 1) * 9))
+	for side in ["L","R"]:
+		_limb("Thigh"+side,"Thigh",skin,.37,.075,.055)
+		_limb("Shin"+side,"Shin",skin,.33,.055,.045)
+		_loft("Foot"+side,"Foot",skin,[Vector4(-.07,.05,.13,-.04),Vector4(.03,.045,.06,0)],5)
+		_limb("Arm"+side,"Upper",skin,.25,.055,.042)
+		_limb("Elbow"+side,"Fore",skin,.21,.042,.035)
+		_box("Hand"+side,"Hand",Vector3(.06,.09,.03),skin,Vector3(0,-.05,0))
+		for f in 3:
+			_box("Hand"+side,"Finger%d" % f,Vector3(.012,.07,.012),bone,Vector3(-.02 + f * .02,-.12,-.01),Vector3(-20,0,0))
+
+## Cinder Crawler: thin, charcoal, ridged spine, an eyeless head split by a glowing mouth.
+func _dress_ghoul() -> void:
+	var skin := _material("2b2528")
+	var glow := _ember()
+	_loft("Pelvis","Hips",skin,[Vector4(-.06,.12,.09,0),Vector4(.08,.11,.08,0)],5)
+	_loft("Chest","Torso",skin,[Vector4(-.1,.11,.09,0),Vector4(.12,.15,.11,0),Vector4(.26,.12,.09,0)],6)
+	for i in 5:
+		_loft("Chest","Spine%d" % i,bone,[Vector4(0,.025,.025,0),Vector4(.12 - i * .012,.001,.001,0)],4,
+				Vector3(0,-.06 + i * .07,.1),Vector3(-55,0,0))
+	_loft("Head","Skull",skin,[Vector4(-.02,.075,.09,0),Vector4(.07,.085,.13,-.03),Vector4(.14,.05,.1,-.05)],6)
+	_box("Head","Maw",Vector3(.1,.016,.02),glow,Vector3(0,.04,-.15))
+	for side in ["L","R"]:
+		_limb("Thigh"+side,"Thigh",skin,.37,.05,.035)
+		_limb("Shin"+side,"Shin",skin,.33,.035,.03)
+		_loft("Foot"+side,"Foot",skin,[Vector4(-.07,.04,.12,-.04),Vector4(.02,.035,.05,0)],4)
+		_limb("Arm"+side,"Upper",skin,.26,.04,.03)
+		_limb("Elbow"+side,"Fore",skin,.22,.03,.025)
+		_box("Hand"+side,"Palm",Vector3(.05,.06,.025),skin,Vector3(0,-.04,0))
+		for f in 3:
+			_loft("Hand"+side,"Talon%d" % f,bone,[Vector4(-.2,.001,.001,0),Vector4(0,.012,.012,0)],4,
+					Vector3(-.018 + f * .018,-.07,-.01),Vector3(-15,0,0))
+
+## Ashbound Brute: a hulking mutant, one arm swallowed by a club of ash rock with ember veins.
+func _dress_brute() -> void:
+	var hide := _material("7a5f50")
+	var rock := _material("3b3436")
+	var glow := _ember()
+	_loft("Pelvis","Hips",hide,[Vector4(-.1,.24,.17,0),Vector4(.1,.26,.18,0)],7)
+	_loft("Pelvis","Belt",iron,[Vector4(.02,.27,.19,0),Vector4(.08,.27,.19,0)],7)
+	_loft("Chest","Torso",hide,[Vector4(-.1,.26,.19,0),Vector4(.1,.36,.26,.02),Vector4(.26,.34,.24,.05),Vector4(.36,.2,.16,.06)],7)
+	for k in 6:
+		_box("Chest","Vein%d" % k,Vector3(.02,.12,.01),glow,Vector3(-.15 + k * .06,.08 + (k % 3) * .04,-.24 - (k % 2) * .01),
+				Vector3(0,0,-25 + k * 10))
+	_loft("Head","Head",hide,[Vector4(-.04,.085,.09,-.02),Vector4(.06,.09,.1,-.02),Vector4(.14,.06,.07,0)],6)
+	for side in [-1.0, 1.0]:
+		_box("Head","Eye",Vector3(.02,.015,.01),glow,Vector3(side * .035,.05,-.12))
+	for side in ["L","R"]:
+		_limb("Thigh"+side,"Thigh",hide,.37,.12,.09,7)
+		_limb("Shin"+side,"Shin",hide,.33,.09,.075,7)
+		_loft("Foot"+side,"Foot",hide,[Vector4(-.07,.08,.16,-.04),Vector4(.03,.07,.08,0)],5)
+	_limb("ArmL","Upper",hide,.26,.11,.08,7)
+	_limb("ElbowL","Fore",hide,.22,.08,.07,7)
+	_box("HandL","Fist",Vector3(.13,.12,.11),hide,Vector3(0,-.06,0))
+	_limb("ArmR","Upper",hide,.26,.14,.11,7)
+	_limb("ElbowR","Growth",rock,.22,.13,.16,6)
+	_loft("HandR","Club",rock,[Vector4(-.38,.06,.06,0),Vector4(-.2,.2,.18,0),Vector4(.02,.15,.14,0)],6)
+	for k in 4:
+		_box("HandR","Seam%d" % k,Vector3(.02,.2,.012),glow,Vector3(-.1 + k * .07,-.18,-.17 + (k % 2) * .02),Vector3(0,0,15 - k * 10))
 
 func _double_sided(source: StandardMaterial3D) -> StandardMaterial3D:
 	var mat := source.duplicate() as StandardMaterial3D

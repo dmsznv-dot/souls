@@ -1,0 +1,32 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/duel/guard.tscn" id="1_guard"]
+[ext_resource type="Resource" path="res://scenes/expedition/enemies/husk_claw.tres" id="2"]
+[ext_resource type="Resource" path="res://scenes/expedition/enemies/husk_lunge.tres" id="3"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/husk_claws.tres" id="4"]
+
+[node name="Husk" instance=ExtResource("1_guard")]
+collision_mask = 7
+role = &"husk"
+title = "ASH HUSK"
+pursuit_speed = 1.15
+notice_distance = 6.5
+acceleration = 4.0
+deceleration = 6.0
+turn_rate = 3.2
+attack_rest = 0.9
+
+[node name="Rig" parent="Heading" index="0"]
+creature = 1
+body_style = 2
+weapon = ExtResource("4")
+
+[node name="LockPoint" parent="." index="2"]
+position = Vector3(0, 1.3, 0)
+
+[node name="Combat" parent="." index="4"]
+light_attack = ExtResource("2")
+heavy_attack = ExtResource("3")
+max_health = 55.0
+flinch_scale = 2.5
+armor = &"cloth"

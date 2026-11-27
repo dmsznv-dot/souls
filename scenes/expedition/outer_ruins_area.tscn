@@ -5,6 +5,10 @@
 [ext_resource type="PackedScene" path="res://scenes/expedition/enemies/spearman.tscn" id="3_spearman"]
 [ext_resource type="PackedScene" path="res://scenes/expedition/enemies/shieldbearer.tscn" id="4_shield"]
 [ext_resource type="PackedScene" path="res://scenes/expedition/enemies/thrower.tscn" id="5_thrower"]
+[ext_resource type="PackedScene" path="res://scenes/expedition/enemies/husk.tscn" id="6_husk"]
+[ext_resource type="PackedScene" path="res://scenes/expedition/enemies/ghoul.tscn" id="7_ghoul"]
+[ext_resource type="PackedScene" path="res://scenes/expedition/enemies/brute.tscn" id="8_brute"]
+[ext_resource type="PackedScene" path="res://scenes/expedition/enemies/bone_sentry.tscn" id="9_sentry"]
 
 [node name="OuterRuinsArea" type="Node3D"]
 script = ExtResource("1_area")
@@ -24,3 +28,20 @@ position = Vector3(-3.2, 0.025, -14)
 
 [node name="Thrower" parent="Enemies" instance=ExtResource("5_thrower")]
 position = Vector3(3.4, 0.025, -23)
+
+[node name="HuskWest" parent="Enemies" instance=ExtResource("6_husk")]
+position = Vector3(-2.6, 0.025, -8.5)
+rotation = Vector3(0, 0.6, 0)
+
+[node name="HuskEast" parent="Enemies" instance=ExtResource("6_husk")]
+position = Vector3(2.4, 0.025, -9.5)
+rotation = Vector3(0, -0.4, 0)
+
+[node name="BoneSentry" parent="Enemies" instance=ExtResource("9_sentry")]
+position = Vector3(0.6, 0.025, -11.5)
+
+[node name="Crawler" parent="Enemies" instance=ExtResource("7_ghoul")]
+position = Vector3(2.6, 0.025, -21.0)
+
+[node name="Brute" parent="Enemies" instance=ExtResource("8_brute")]
+position = Vector3(0, 0.025, -27.0)

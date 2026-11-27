@@ -85,12 +85,14 @@ func _run() -> void:
 func _test_ruins(world: Node3D) -> void:
 	var hero := world.get_node("Player") as CharacterBody3D
 	var actors: Array = world.ruins.enemies()
-	_check(actors.size() == 3, "three enemies are placed beyond the gate")
+	_check(actors.size() == 8, "eight foes hold the ruins beyond the gate")
 	var roles: Array[StringName] = []
 	for enemy in actors:
-		roles.append(enemy.role)
+		if not roles.has(enemy.role):
+			roles.append(enemy.role)
 		enemy.ai_enabled = false
-	_check(roles == [&"spearman", &"shield", &"thrower"], "all three enemies have different roles")
+	_check(roles.size() == 6 and roles.has(&"husk") and roles.has(&"ghoul") and roles.has(&"brute"),
+		"six kinds of foe: spearman, shieldbearer, thrower, husk, crawler, brute")
 	await _ticks(6)
 	var shield: CharacterBody3D = actors[1]
 	hero.global_position = shield.global_position + Vector3.FORWARD * 1.6
@@ -136,9 +138,9 @@ func _test_ruins(world: Node3D) -> void:
 	await _ticks(6)
 	_check(world.scene_file_path == BOSS_SCENE and world.outcome == &"victory",
 		"retry keeps the world and the Gatekeeper's defeat")
-	_check(world.ruins != old_area and world.ruins.remaining == 3
+	_check(world.ruins != old_area and world.ruins.remaining == 8
 			and world.ruins.enemies()[1].get_node("Combat").health == world.ruins.enemies()[1].get_node("Combat").max_health,
-		"retry restores all three ruins guards")
+		"retry restores every ruins foe")
 	_check(hero_combat.health == hero_combat.max_health and hero.can_fight
 			and hero.global_position.distance_to(world.ruins.entrance_transform().origin) < 0.5,
 		"the hero rises at the ruins' entrance")
@@ -155,7 +157,7 @@ func _test_ruins(world: Node3D) -> void:
 		_click(MOUSE_BUTTON_LEFT)
 		await _ticks(47)
 	_check(world.ruins.remaining == 0 and world.ruins_outcome == &"victory",
-		"defeating all three completes the expedition")
+		"defeating every foe completes the expedition")
 
 
 func _test_standalone_ruins() -> void:
@@ -163,7 +165,7 @@ func _test_standalone_ruins() -> void:
 	await scene_changed
 	await _ticks(4)
 	var area := current_scene.get_node("Area")
-	_check(area.enemies().size() == 3 and area.enemies()[0].player == current_scene.get_node("Player"),
+	_check(area.enemies().size() == 8 and area.enemies()[0].player == current_scene.get_node("Player"),
 		"the ruins remain playable as a standalone scene")
 
 

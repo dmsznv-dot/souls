@@ -1,0 +1,42 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/duel/guard.tscn" id="1_guard"]
+[ext_resource type="Resource" path="res://scenes/expedition/enemies/ghoul_swipe.tres" id="2"]
+[ext_resource type="Resource" path="res://scenes/expedition/enemies/ghoul_pounce.tres" id="3"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/ghoul_claws.tres" id="4"]
+
+[sub_resource type="CapsuleShape3D" id="Body"]
+radius = 0.34
+height = 1.5
+
+[node name="Ghoul" instance=ExtResource("1_guard")]
+collision_mask = 7
+role = &"ghoul"
+title = "CINDER CRAWLER"
+pursuit_speed = 4.4
+notice_distance = 8.5
+acceleration = 22.0
+deceleration = 16.0
+turn_rate = 11.0
+retreat_after_attack = 0.7
+attack_rest = 0.35
+
+[node name="Collision" parent="." index="0"]
+position = Vector3(0, 0.75, 0)
+shape = SubResource("Body")
+
+[node name="Rig" parent="Heading" index="0"]
+scale = Vector3(0.82, 0.82, 0.82)
+creature = 2
+body_style = 3
+weapon = ExtResource("4")
+
+[node name="LockPoint" parent="." index="2"]
+position = Vector3(0, 0.95, 0)
+
+[node name="Combat" parent="." index="4"]
+light_attack = ExtResource("2")
+heavy_attack = ExtResource("3")
+max_health = 30.0
+flinch_scale = 2.6
+armor = &"cloth"

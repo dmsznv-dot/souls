@@ -1,0 +1,29 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/duel/guard.tscn" id="1_guard"]
+[ext_resource type="Resource" path="res://scenes/duel/combat/guard_slash.tres" id="2"]
+[ext_resource type="Resource" path="res://scenes/duel/combat/guard_thrust.tres" id="3"]
+
+[node name="BoneSentry" instance=ExtResource("1_guard")]
+collision_mask = 7
+role = &"shield"
+title = "BONE SENTRY"
+pursuit_speed = 2.6
+notice_distance = 6.0
+attack_rest = 0.7
+
+[node name="Rig" parent="Heading" index="0"]
+scale = Vector3(0.95, 0.95, 0.95)
+guard_variant = true
+equipment = 3
+body_style = 1
+
+[node name="LockPoint" parent="." index="2"]
+position = Vector3(0, 1.3, 0)
+
+[node name="Combat" parent="." index="4"]
+light_attack = ExtResource("2")
+heavy_attack = ExtResource("3")
+max_health = 65.0
+flinch_scale = 1.3
+armor = &"bone"
