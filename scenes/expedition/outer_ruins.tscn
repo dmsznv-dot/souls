@@ -1,12 +1,9 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scenes/expedition/outer_ruins.gd" id="1_script"]
-[ext_resource type="PackedScene" path="res://scenes/expedition/environment/outer_ruins_environment.tscn" id="2_environment"]
+[ext_resource type="PackedScene" path="res://scenes/expedition/outer_ruins_area.tscn" id="2_area"]
 [ext_resource type="PackedScene" path="res://scenes/duel/duel_player.tscn" id="3_player"]
 [ext_resource type="PackedScene" path="res://scenes/duel/audio/duel_audio.tscn" id="4_audio"]
-[ext_resource type="PackedScene" path="res://scenes/expedition/enemies/spearman.tscn" id="5_spearman"]
-[ext_resource type="PackedScene" path="res://scenes/expedition/enemies/shieldbearer.tscn" id="6_shield"]
-[ext_resource type="PackedScene" path="res://scenes/expedition/enemies/thrower.tscn" id="7_thrower"]
 
 [sub_resource type="StyleBoxFlat" id="Track"]
 bg_color = Color(0.05, 0.05, 0.065, 0.94)
@@ -30,26 +27,12 @@ content_margin_bottom = 10.0
 [node name="OuterRuins" type="Node3D"]
 script = ExtResource("1_script")
 
-[node name="Environment" parent="." instance=ExtResource("2_environment")]
+[node name="Area" parent="." instance=ExtResource("2_area")]
 
 [node name="Player" parent="." instance=ExtResource("3_player")]
 position = Vector3(0, 0.025, 4)
 
 [node name="Audio" parent="." instance=ExtResource("4_audio")]
-
-[node name="Enemies" type="Node3D" parent="."]
-
-[node name="Spearman" parent="Enemies" node_paths=PackedStringArray("player") instance=ExtResource("5_spearman")]
-position = Vector3(0, 0.025, -4)
-player = NodePath("../../Player")
-
-[node name="Shieldbearer" parent="Enemies" node_paths=PackedStringArray("player") instance=ExtResource("6_shield")]
-position = Vector3(-3.2, 0.025, -14)
-player = NodePath("../../Player")
-
-[node name="Thrower" parent="Enemies" node_paths=PackedStringArray("player") instance=ExtResource("7_thrower")]
-position = Vector3(3.4, 0.025, -23)
-player = NodePath("../../Player")
 
 [node name="Interface" type="CanvasLayer" parent="."]
 
@@ -145,8 +128,8 @@ anchor_left = 0.5
 anchor_right = 0.5
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = -396.0
-offset_right = 396.0
+offset_left = -470.0
+offset_right = 470.0
 offset_top = -52.0
 offset_bottom = -16.0
 mouse_filter = 2
@@ -160,7 +143,7 @@ theme_override_colors/font_shadow_color = Color(0.03, 0.03, 0.045, 0.94)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 2
 theme_override_font_sizes/font_size = 14
-text = "WASD  Move    ·    LMB / R  Attack    ·    RMB / Q  Guard / Parry    ·    Space / F  Dodge / Jump    ·    T  Retry"
+text = "WASD  Move  ·  LMB / R  Attack  ·  RMB / Q  Guard / Parry  ·  Space / F  Dodge / Jump  ·  Shift  Sprint  ·  Tab  Weapon  ·  T  Retry"
 horizontal_alignment = 1
 
 [node name="Result" type="PanelContainer" parent="Interface"]

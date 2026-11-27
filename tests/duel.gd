@@ -69,8 +69,15 @@ func _test_buffer() -> void:
 	_press_mouse(false)
 	await _ticks(7)
 	_key(KEY_R)
-	await _ticks(34)
-	_check(_hero_combat.action == &"", "press well before recovery expires")
+	await _ticks(20)
+	_check(_hero_combat.action == &"heavy", "press during the windup is held until the swing's cancel point")
+	await _arena()
+	_key(KEY_SPACE)
+	await _ticks(3)
+	_press_mouse()
+	_press_mouse(false)
+	await _ticks(36)
+	_check(_hero_combat.action == &"", "a press early in a roll expires before the roll ends")
 
 
 func _test_defenses() -> void:
@@ -112,7 +119,7 @@ func _test_defenses() -> void:
 	await _ticks(14)
 	_press_mouse()
 	_press_mouse(false)
-	await _ticks(12)
+	await _ticks(18)
 	_check(_guard_combat.health == 73.0, "first hit after parry deals bonus damage")
 
 	await _arena()

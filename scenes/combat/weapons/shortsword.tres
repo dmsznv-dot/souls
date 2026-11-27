@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="SoulsWeapon" format=3]
+
+[ext_resource type="Script" path="res://scenes/combat/weapons/weapon_data.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/duel/combat/attack_data.gd" id="s"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/attacks/shortsword_light_a.tres" id="a0"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/attacks/shortsword_light_b.tres" id="a1"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/attacks/shortsword_heavy.tres" id="a2"]
+
+[resource]
+script = ExtResource("1")
+display_name = "Pilgrim Shortsword"
+form = 0
+light_chain = Array[ExtResource("s")]([ExtResource("a0"), ExtResource("a1")])
+heavy = ExtResource("a2")
+blade_length = 0.6
+grip_length = 0.15
+blade_half_width = 0.03
+dead_length = 0.1
+mass = 1.6
+trail_color = Color(0.9, 0.93, 0.95, 0.5)

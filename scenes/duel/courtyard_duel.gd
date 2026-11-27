@@ -32,13 +32,17 @@ func _ready() -> void:
 	_hero.defeated.connect(_finish.bind(&"defeat"))
 	_guard.defeated.connect(_finish.bind(&"victory"))
 	_guard_hp.max_value = _guard.max_health
+	Music.play_area(&"court", 1.5)
+	Music.attach_torches(self)
+	_hero.weapon_changed.connect(func(weapon: SoulsWeapon) -> void: _show_notice(weapon.display_name, 1.2))
 	if not post_victory_path.is_empty():
 		$Guard.phase_changed.connect(_on_boss_phase)
 		$Interface/GuardMeters/Caption.text = "THE ASH GATEKEEPER"
-		$Interface/Bindings/Keys/Other.text = "F / X  Jump   ·   E / A  Gate   ·   T / Menu  Retry   ·   F2  Debug"
+		$Interface/Bindings/Keys/Other.text = "Shift / L3  Sprint   ·   Tab / D-pad  Weapon   ·   F / X  Jump   ·   E / A  Gate   ·   T  Retry   ·   F2  Debug"
 
 
 func _process(delta: float) -> void:
+	_update_music()
 	_player_hp.value = _hero.health
 	_stamina.value = _hero.stamina
 	_guard_hp.value = _guard.health
@@ -51,6 +55,13 @@ func _process(delta: float) -> void:
 			_hero.phase_name(), _guard.phase_name(), $Player.buffer_status()]
 		_draw_attack(_hero, _hero_arc)
 		_draw_attack(_guard, _guard_arc)
+
+
+func _update_music() -> void:
+	if outcome == &"":
+		Music.set_intensity(2 if $Guard.is_engaged() else 1)
+	else:
+		Music.set_intensity(1 if outcome == &"victory" else 0)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -93,8 +104,9 @@ func _on_boss_phase(phase: int) -> void:
 	_show_notice("The Gatekeeper readies his blade", 1.8)
 
 
-func _on_feedback(cue: StringName, location: Vector3) -> void:
-	_audio.play_cue(cue, location)
+func _on_feedback(cue: StringName, location: Vector3, strength: float = 0.5) -> void:
+	_audio.play_cue(cue, location, strength)
+	$Player.on_world_impact(cue, location, strength)
 	match cue:
 		&"tired":
 			_show_notice("Out of stamina")

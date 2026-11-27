@@ -15,3 +15,6 @@ posture_damage = 54.0
 reach = 2.42
 arc = 92.0
 lunge_speed = 2.4
+impact = 0.7
+chain_point = 0.45
+roll_cancel_point = 0.6

@@ -56,23 +56,35 @@ func _run() -> void:
 	hero.global_position = Vector3(0.0, 0.02, -10.45)
 	await _ticks(5)
 	_key(KEY_E)
-	for i in 8:
-		if current_scene != null and current_scene.scene_file_path == RUINS_SCENE:
+	await _ticks(3)
+	var world := current_scene
+	_check(world.scene_file_path == BOSS_SCENE and world.get_node("AshGate").is_open,
+		"the seal opens in place without loading another scene")
+	_check(world.ruins != null and world.ruins.is_inside_tree() and world.ruins.position.z < -20.0,
+		"the outer ruins stream in behind the gate")
+	_check(world.ruins.enemies()[0].player == hero, "ruins enemies hunt the same player")
+	_key(KEY_E)
+	await _ticks(160)
+	for i in 420:
+		Input.action_press(&"move_forward")
+		await physics_frame
+		if hero.global_position.z < -19.0:
 			break
-		await process_frame
-	if not _check(current_scene != null and current_scene.scene_file_path == RUINS_SCENE,
-			"victory opens the transition to the outer ruins"):
-		quit(1)
-		return
-	await _test_ruins()
+	Input.action_release(&"move_forward")
+	_check(hero.global_position.z < -19.0, "the hero walks through the archway and across the bridge")
+	_check(world.zone == &"ruins" and root.get_node("Music").area == &"ruins",
+		"crossing the bridge switches the zone and crossfades the score")
+	_check(not world.get_node("Environment/Court/AshHills").visible, "court backdrop hides once inside the ruins")
+	await _test_ruins(world)
 	await _ticks(65)
+	await _test_standalone_ruins()
 	print("Expedition: %d/%d checks passed." % [_passed, _passed + _failed])
 	quit(0 if _failed == 0 else 1)
 
 
-func _test_ruins() -> void:
-	var hero := current_scene.get_node("Player") as CharacterBody3D
-	var actors := current_scene.get_node("Enemies").get_children()
+func _test_ruins(world: Node3D) -> void:
+	var hero := world.get_node("Player") as CharacterBody3D
+	var actors: Array = world.ruins.enemies()
 	_check(actors.size() == 3, "three enemies are placed beyond the gate")
 	var roles: Array[StringName] = []
 	for enemy in actors:
@@ -111,6 +123,29 @@ func _test_ruins() -> void:
 	_check(hero.get_node("Combat").health == health_before and hero.get_node("Combat").stamina < 100.0,
 		"frontal shield catches a bolt grazing the side of the capsule")
 	_set_mouse(MOUSE_BUTTON_RIGHT, false)
+
+	# Falling in the ruins resets them at their entrance; the Gatekeeper stays defeated.
+	var hero_combat := hero.get_node("Combat")
+	var old_area: Node3D = world.ruins
+	shield_combat.health = 1.0
+	hero_combat.health = 1.0
+	hero_combat.receive_attack(thrower_combat, thrower_combat.light_attack, Vector3.BACK)
+	await _ticks(40)
+	_check(world.ruins_outcome == &"defeat" and not hero.can_fight, "a fall in the ruins ends the attempt")
+	_key(KEY_T)
+	await _ticks(6)
+	_check(world.scene_file_path == BOSS_SCENE and world.outcome == &"victory",
+		"retry keeps the world and the Gatekeeper's defeat")
+	_check(world.ruins != old_area and world.ruins.remaining == 3
+			and world.ruins.enemies()[1].get_node("Combat").health == world.ruins.enemies()[1].get_node("Combat").max_health,
+		"retry restores all three ruins guards")
+	_check(hero_combat.health == hero_combat.max_health and hero.can_fight
+			and hero.global_position.distance_to(world.ruins.entrance_transform().origin) < 0.5,
+		"the hero rises at the ruins' entrance")
+
+	actors = world.ruins.enemies()
+	for enemy in actors:
+		enemy.ai_enabled = false
 	for enemy in actors:
 		enemy.get_node("Combat").health = 1.0
 		hero.global_position = enemy.global_position + Vector3.BACK * 1.5
@@ -119,8 +154,17 @@ func _test_ruins() -> void:
 		await _ticks(22)
 		_click(MOUSE_BUTTON_LEFT)
 		await _ticks(47)
-	_check(current_scene.remaining_enemies == 0 and current_scene.outcome == &"victory",
+	_check(world.ruins.remaining == 0 and world.ruins_outcome == &"victory",
 		"defeating all three completes the expedition")
+
+
+func _test_standalone_ruins() -> void:
+	change_scene_to_file(RUINS_SCENE)
+	await scene_changed
+	await _ticks(4)
+	var area := current_scene.get_node("Area")
+	_check(area.enemies().size() == 3 and area.enemies()[0].player == current_scene.get_node("Player"),
+		"the ruins remain playable as a standalone scene")
 
 
 func _check(passed: bool, description: String) -> bool:

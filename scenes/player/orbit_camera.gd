@@ -7,6 +7,11 @@ extends Node3D
 @export_range(0.05, 1.0, 0.01, "suffix:s") var occlusion_grace_time: float = 0.35
 @export_range(-0.4, 0.4, 0.01, "suffix:rad") var lock_yaw_offset: float = 0.0
 @export_flags_3d_physics var sight_collision_mask: int = 1
+## How quickly the rig catches up with the body. Lower values trail more and read as weight.
+@export_range(1.0, 40.0, 0.5) var follow_rate: float = 14.0
+@export_range(1.0, 40.0, 0.5) var vertical_follow_rate: float = 7.0
+## Player setting, 0..1. Scales screen shake.
+@export_range(0.0, 1.0, 0.05) var shake_strength: float = 1.0
 
 var lock_target: Marker3D
 
@@ -15,6 +20,11 @@ var _using_mouse: bool = true
 var _lock_requested: bool
 var _occlusion_time: float
 var _camera_distance: float
+var _anchor_offset: Vector3
+var _follow: Vector3
+var trauma: float
+var _shake_clock: float
+var _base_fov: float
 
 @onready var _pitch: Node3D = $Pitch
 @onready var _arm: SpringArm3D = $Pitch/SpringArm
@@ -26,6 +36,15 @@ var _camera_distance: float
 func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_camera_distance = _arm.spring_length
+	_base_fov = _camera.fov
+	_anchor_offset = position
+	top_level = true
+	_follow = get_parent().global_position + _anchor_offset
+	global_position = _follow
+
+
+func add_trauma(amount: float) -> void:
+	trauma = clampf(trauma + amount, 0.0, 1.0)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -45,6 +64,15 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func update_orbit(delta: float) -> void:
+	# Trail the body slightly: snappy in the plane, softer vertically so jumps and steps breathe.
+	var goal: Vector3 = get_parent().global_position + _anchor_offset
+	if _follow.distance_squared_to(goal) > 16.0:
+		_follow = goal
+	var plane := 1.0 - exp(-follow_rate * delta)
+	_follow.x = lerpf(_follow.x, goal.x, plane)
+	_follow.z = lerpf(_follow.z, goal.z, plane)
+	_follow.y = lerpf(_follow.y, goal.y, 1.0 - exp(-vertical_follow_rate * delta))
+	global_position = _follow
 	_update_lock(delta)
 	if is_instance_valid(lock_target):
 		var offset := lock_target.global_position - global_position
@@ -68,6 +96,27 @@ func _process(delta: float) -> void:
 		move_toward(_camera_distance, _arm.spring_length, camera_return_speed * delta))
 	# The arm moves its direct child immediately. The camera can only offset inward.
 	_camera.position.z = _camera_distance - safe_distance
+	_update_shake(delta)
+	var body := get_parent()
+	var sprint_fov: float = _base_fov + (5.0 if body.get(&"sprinting") else 0.0)
+	_camera.fov = lerpf(_camera.fov, sprint_fov, 1.0 - exp(-4.0 * delta))
+
+
+## Trauma-squared shake on the camera only, decaying in real time so hit-stop cannot freeze it
+## off-centre. Summed sines instead of per-frame noise keep it from buzzing.
+func _update_shake(delta: float) -> void:
+	var real_delta := delta / maxf(Engine.time_scale, 0.0001)
+	if trauma <= 0.0:
+		_camera.h_offset = 0.0
+		_camera.v_offset = 0.0
+		_camera.rotation.z = 0.0
+		return
+	trauma = maxf(trauma - 1.6 * real_delta, 0.0)
+	_shake_clock += real_delta * 32.0
+	var shake := trauma * trauma * shake_strength
+	_camera.h_offset = 0.16 * shake * sin(_shake_clock * 1.7)
+	_camera.v_offset = 0.11 * shake * sin(_shake_clock * 2.3 + 1.1)
+	_camera.rotation.z = 0.035 * shake * sin(_shake_clock * 1.1 + 0.4)
 
 
 func _update_lock(delta: float) -> void:

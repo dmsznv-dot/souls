@@ -16,3 +16,6 @@ reach = 8.5
 arc = 32.0
 lunge_speed = 0.0
 projectile_speed = 13.0
+impact = 0.3
+chain_point = 0.3
+roll_cancel_point = 0.55

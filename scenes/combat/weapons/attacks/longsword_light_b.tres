@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="DuelAttack" format=3]
+
+[ext_resource type="Script" path="res://scenes/duel/combat/attack_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+clip = &"light_b"
+windup = 0.17
+active = 0.1
+recovery = 0.29
+damage = 19.0
+stamina_cost = 15.0
+block_cost = 17.0
+posture_damage = 26.0
+reach = 2.0
+arc = 110.0
+lunge_speed = 1.6
+impact = 0.38
+chain_point = 0.3
+roll_cancel_point = 0.55

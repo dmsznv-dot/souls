@@ -28,6 +28,12 @@ const CUT_DOWN := {
 	"HandR": Vector3(-51,0,0), "ArmL": Vector3(47,-10,3), "ElbowL": Vector3(16,0,0),
 	"ThighL": Vector3(32,0,-4), "ShinL": Vector3(-42,0,0), "Cape": Vector3(-36,0,0)
 }
+## Backhand return cut: the blade crosses from the left shoulder out past the right hip.
+const BACKHAND_OUT := {
+	"Chest": Vector3(-14,-42,-9), "ArmR": Vector3(68,-74,46), "ElbowR": Vector3(9,-10,0),
+	"HandR": Vector3(-24,-26,0), "ArmL": Vector3(22,18,-28), "ElbowL": Vector3(30,0,0),
+	"ThighR": Vector3(24,0,6), "ShinR": Vector3(-34,0,0), "Cape": Vector3(-24,8,16)
+}
 const DRAW_BACK := {
 	"Chest": Vector3(1,-44,-6), "ArmR": Vector3(-32,-14,23), "ElbowR": Vector3(73,0,0),
 	"HandR": Vector3(-39,41,0), "ArmL": Vector3(48,10,-16), "ElbowL": Vector3(22,0,0)
@@ -100,6 +106,13 @@ static func create(skeleton: Skeleton3D) -> AnimationLibrary:
 	_add(lib,skeleton,&"light",[[0,{}],[.26,WIND_SLASH,Vector3(.038,-.035,.024)],
 			[.44,load_slash,Vector3(.052,-.056,.028)],[.60,CUT_ACROSS,Vector3(-.023,-.033,-.066)],
 			[.72,follow_slash,Vector3(-.040,-.064,-.080)],[.88,CUT_ACROSS,-.024],[1,{}]])
+	var load_back := CUT_ACROSS.merged({"Pelvis":Vector3(-4,24,4),"Chest":Vector3(-13,50,9),
+			"HandR":Vector3(-10,22,4),"Head":Vector3(3,-20,0)},true)
+	var follow_back := BACKHAND_OUT.merged({"Pelvis":Vector3(-6,-20,-4),"Chest":Vector3(-16,-52,-10),
+			"HandR":Vector3(-30,-34,0)},true)
+	_add(lib,skeleton,&"light_b",[[0,CUT_ACROSS,-.024],[.26,load_back,Vector3(.03,-.04,.02)],
+			[.44,load_back,Vector3(.045,-.055,.028)],[.60,BACKHAND_OUT,Vector3(-.02,-.04,-.06)],
+			[.72,follow_back,Vector3(-.035,-.06,-.075)],[.88,BACKHAND_OUT,-.024],[1,{}]])
 	_add(lib,skeleton,&"enemy_slash",[[0,{}],[.29,WIND_SLASH,-.04],[.44,load_slash,Vector3(.048,-.07,.035)],
 			[.59,CUT_ACROSS,Vector3(-.022,-.048,-.067)],[.74,follow_slash,Vector3(-.055,-.082,-.073)],[1,{}]])
 	_add(lib,skeleton,&"heavy",[[0,{}],[.22,WIND_HIGH,Vector3(.03,-.046,.015)],

@@ -3,17 +3,30 @@ extends CharacterBody3D
 const OrbitCamera = preload("res://scenes/player/orbit_camera.gd")
 const Combatant = preload("res://scenes/duel/combat/combatant.gd")
 const COMBAT_PRESSES: Array[StringName] = [&"roll", &"parry", &"heavy_attack", &"light_attack", &"jump"]
-const BUFFER_SECONDS: float = 0.12
+## Presses are kept this long while an action plays. Long enough to queue the next swing or a
+## dodge during recovery, short enough that a stale press does not fire after the fact.
+const BUFFER_SECONDS: float = 0.26
 const JUMP_SPEED: float = 3.55
+const SPRINT_STAMINA_PER_SECOND: float = 13.0
 
 @export_range(0.1, 12.0, 0.1, "suffix:m/s") var move_speed: float = 4.5
+@export_range(0.1, 12.0, 0.1, "suffix:m/s") var sprint_speed: float = 6.4
 @export_range(1.0, 30.0, 0.5, "suffix:rad/s") var turn_speed: float = 14.0
+## Start-up acceleration. 0 snaps to the input velocity (legacy behaviour).
 @export_range(0.0, 100.0, 1.0, "suffix:m/s²") var move_acceleration: float = 0.0
+## Braking when the stick is released or reversed. Lower values carry more momentum.
+@export_range(0.0, 100.0, 1.0, "suffix:m/s²") var move_deceleration: float = 0.0
+@export var weapons: Array[SoulsWeapon] = []
 
 var can_fight: bool = true
+var sprinting: bool
 var _buffered_action: StringName
 var _buffer_time: float
 var _roll_backwards: bool
+var _weapon_index: int
+var _lean := Vector2.ZERO
+var _previous_velocity := Vector3.ZERO
+var _was_on_floor := true
 
 @onready var _heading: Node3D = $Heading
 @onready var _camera_rig: OrbitCamera = $CameraRig
@@ -21,13 +34,29 @@ var _roll_backwards: bool
 @onready var _rig: Node3D = get_node_or_null("Heading/Rig")
 
 
+func _ready() -> void:
+	if _combat != null and not weapons.is_empty():
+		_combat.equip(weapons[0])
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if _combat == null or not can_fight or _combat.action == &"dead":
+		return
+	if event.is_action_pressed(&"switch_weapon"):
+		cycle_weapon()
 		return
 	for action in COMBAT_PRESSES:
 		if event.is_action_pressed(action):
 			_buffer(action)
 			break
+
+
+func cycle_weapon() -> bool:
+	if weapons.size() < 2 or _combat.action != &"" or _combat.contact_frozen:
+		return false
+	_weapon_index = (_weapon_index + 1) % weapons.size()
+	_combat.equip(weapons[_weapon_index])
+	return true
 
 
 func _physics_process(delta: float) -> void:
@@ -39,7 +68,8 @@ func _physics_process(delta: float) -> void:
 		back = _flat_direction(global_position - target.global_position)
 	var right := Vector3.UP.cross(back)
 	var direction := right * input.x + back * input.y
-	var motion := direction * move_speed
+	_update_sprint(direction, delta)
+	var motion := direction * (sprint_speed if sprinting else move_speed)
 	if _combat != null:
 		var was_free := _combat.action == &""
 		motion = _combat_motion(motion, direction, delta)
@@ -50,15 +80,23 @@ func _physics_process(delta: float) -> void:
 	if _combat != null and _combat.contact_frozen:
 		horizontal = Vector3.ZERO
 	elif move_acceleration > 0.0 and (_combat == null or _combat.action != &"roll"):
-		var correction := 1.5 if motion.dot(horizontal) < horizontal.length_squared() else 1.0
-		horizontal = horizontal.move_toward(motion, move_acceleration * correction * delta)
+		var braking := motion.length_squared() < horizontal.length_squared() or motion.dot(horizontal) < 0.0
+		var rate := move_deceleration if braking and move_deceleration > 0.0 else move_acceleration
+		if not is_on_floor():
+			rate *= 0.35
+		horizontal = horizontal.move_toward(motion, rate * delta)
 	else:
 		horizontal = motion
+	if _combat != null:
+		horizontal += _combat.push
 	velocity.x = horizontal.x
 	velocity.z = horizontal.z
 	if not is_on_floor():
 		velocity += get_gravity() * delta
 	move_and_slide()
+	if is_on_floor() and not _was_on_floor and _combat != null:
+		_combat.feedback.emit(&"land", global_position, 0.3)
+	_was_on_floor = is_on_floor()
 
 	_update_heading(target, direction, delta)
 	if _rig != null:
@@ -67,7 +105,33 @@ func _physics_process(delta: float) -> void:
 		var phase := _combat.pose_phase()
 		if _combat.action == &"roll" and _roll_backwards:
 			phase = 1.0 - phase
+		_update_lean(delta)
 		_rig.apply_motion(_combat.clip(), phase, local_motion, delta)
+
+
+func _update_sprint(direction: Vector3, delta: float) -> void:
+	var wants := (can_fight and _combat != null and _combat.action == &"" and not _combat.blocking
+			and direction.length_squared() > 0.25 and Input.is_action_pressed(&"sprint"))
+	if wants and _combat.stamina > 1.0:
+		sprinting = true
+		_combat.stamina = maxf(0.0, _combat.stamina - SPRINT_STAMINA_PER_SECOND * delta)
+		_combat.blocking = false
+	else:
+		sprinting = false
+
+
+func _update_lean(delta: float) -> void:
+	var real := get_real_velocity()
+	real.y = 0.0
+	var acceleration := (real - _previous_velocity) / maxf(delta, 0.0001)
+	_previous_velocity = real
+	var local := _heading.global_basis.inverse() * acceleration
+	# Forward is -Z: accelerating forward tips the chest forward, braking rocks it back.
+	var goal := Vector2(local.x, -local.z) * 0.006
+	if _combat != null and _combat.action != &"":
+		goal = Vector2.ZERO
+	_lean = _lean.lerp(goal.limit_length(0.16), 1.0 - exp(-10.0 * delta))
+	_rig.set_lean(_lean)
 
 
 func _combat_motion(motion: Vector3, direction: Vector3, delta: float) -> Vector3:
@@ -76,15 +140,17 @@ func _combat_motion(motion: Vector3, direction: Vector3, delta: float) -> Vector
 			_buffer(&"parry")
 		elif Input.is_action_just_pressed(&"heavy_trigger"):
 			_buffer(&"heavy_attack")
-	_combat.blocking = can_fight and _combat.action == &"" and Input.is_action_pressed(&"block")
+	_combat.blocking = can_fight and _combat.action == &"" and not sprinting and Input.is_action_pressed(&"block")
 	_combat.advance(delta)
 	if not can_fight:
 		_buffered_action = &""
 	elif _buffered_action != &"":
+		if _combat.action != &"" and _combat.can_cancel_into(_buffered_action):
+			_combat.cancel_recovery()
 		if _combat.action == &"" and not _combat.contact_frozen:
 			match _buffered_action:
-				&"light_attack": _combat.start_attack(_combat.light_attack)
-				&"heavy_attack": _combat.start_attack(_combat.heavy_attack)
+				&"light_attack": _combat.start_light()
+				&"heavy_attack": _combat.start_heavy()
 				&"parry": _combat.start_parry()
 				&"jump":
 					var airtime := 2.0 * JUMP_SPEED / get_gravity().length()
@@ -96,7 +162,7 @@ func _combat_motion(motion: Vector3, direction: Vector3, delta: float) -> Vector
 					if _combat.start_roll(dodge):
 						_roll_backwards = backwards
 			_buffered_action = &""
-		else:
+		elif not _holds_buffer():
 			_buffer_time -= delta
 			if _buffer_time <= 0.0:
 				_buffered_action = &""
@@ -115,18 +181,31 @@ func _update_heading(target: Marker3D, direction: Vector3, delta: float) -> void
 		if _combat.action == &"roll" and not _roll_backwards:
 			var dodge := _combat.dodge_direction
 			_heading.rotation.y = atan2(-dodge.x, -dodge.z)
+		elif _combat.attack != null and _combat.action_age < _combat.attack.windup * 0.6 and direction.length_squared() > 0.04:
+			# Early windup still accepts a steer, as in Souls games; after that the swing commits.
+			var steer := atan2(-direction.x, -direction.z)
+			_heading.rotation.y = rotate_toward(_heading.rotation.y, steer, 9.0 * delta)
 		return
-	if is_instance_valid(target):
+	if is_instance_valid(target) and not sprinting:
 		_face_target(target, turn_speed * delta if _combat != null else TAU)
 	elif direction.length_squared() > 0.0:
 		var desired_yaw := atan2(-direction.x, -direction.z)
-		_heading.rotation.y = rotate_toward(_heading.rotation.y, desired_yaw, turn_speed * delta)
+		var rate := turn_speed * (0.6 if sprinting else 1.0)
+		_heading.rotation.y = rotate_toward(_heading.rotation.y, desired_yaw, rate * delta)
 
 
 func _face_target(target: Marker3D, turn_limit: float = TAU) -> void:
 	var towards_target := _flat_direction(target.global_position - global_position)
 	var target_yaw := atan2(-towards_target.x, -towards_target.z)
 	_heading.rotation.y = rotate_toward(_heading.rotation.y, target_yaw, turn_limit)
+
+
+## A press made after a swing has started cutting waits for that swing's cancel point,
+## so a queued follow-up or dodge is never lost to a slow weapon's long recovery.
+func _holds_buffer() -> bool:
+	var swing := _combat.attack
+	return (swing != null and _combat.action_age >= swing.windup
+			and _buffered_action in [&"light_attack", &"heavy_attack", &"roll"])
 
 
 func _buffer(action: StringName) -> void:
@@ -136,6 +215,22 @@ func _buffer(action: StringName) -> void:
 
 func buffer_status() -> String:
 	return "%s %d ms" % [_buffered_action, roundi(_buffer_time * 1000.0)] if _buffered_action != &"" else "—"
+
+
+## Camera trauma for nearby impacts; blows the player gives or takes shake hardest.
+func on_world_impact(cue: StringName, location: Vector3, strength: float) -> void:
+	var base := 0.0
+	match cue:
+		&"hit", &"death": base = lerpf(0.22, 0.6, strength)
+		&"block": base = lerpf(0.12, 0.32, strength)
+		&"guard_break": base = 0.55
+		&"parry": base = 0.3
+		&"land": base = 0.12
+		&"heavy": base = 0.08 * strength
+	if base <= 0.0:
+		return
+	var falloff := clampf(1.0 - global_position.distance_to(location) / 9.0, 0.0, 1.0)
+	_camera_rig.add_trauma(base * falloff)
 
 
 func _flat_direction(vector: Vector3) -> Vector3:

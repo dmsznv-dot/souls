@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="SoulsWeapon" format=3]
+
+[ext_resource type="Script" path="res://scenes/combat/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "Cinder Javelin"
+form = 4
+blade_length = 1.07
+grip_length = 0.63
+blade_half_width = 0.022
+dead_length = 0.7
+mass = 1.2
+trail_color = Color(1, 0.6, 0.3, 0.4)

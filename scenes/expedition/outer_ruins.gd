@@ -1,20 +1,17 @@
 extends Node3D
+## Standalone Outer Ruins: the area with its own player and HUD. The expedition reaches the
+## same area seamlessly from the Ash Court; this scene keeps it playable and testable alone.
 
 const Combatant = preload("res://scenes/duel/combat/combatant.gd")
-const CAPTIONS := {
-	&"spearman": "PALE SPEARMAN",
-	&"shield": "ASH SHIELDBEARER",
-	&"thrower": "CINDER THROWER",
-}
 
 var remaining_enemies: int
 var outcome: StringName
 var _notice_time: float
 var _retry_pending: bool
 
+@onready var _area: Node3D = $Area
 @onready var _hero: Combatant = $Player/Combat
 @onready var _audio: Node3D = $Audio
-@onready var _enemies := $Enemies.get_children()
 @onready var _vitality: ProgressBar = %Vitality
 @onready var _stamina: ProgressBar = %Stamina
 @onready var _group_status: Label = %GroupStatus
@@ -26,17 +23,25 @@ var _retry_pending: bool
 
 
 func _ready() -> void:
-	remaining_enemies = _enemies.size()
+	_area.setup($Player, false)
+	remaining_enemies = _area.remaining
+	Music.play_area(&"ruins", 2.0)
+	Music.attach_torches(self)
 	_hero.defeated.connect(_finish.bind(&"defeat"))
 	_hero.feedback.connect(_play_feedback)
-	for enemy in _enemies:
-		var combat: Combatant = enemy.get_node("Combat")
-		combat.defeated.connect(_enemy_defeated.bind(enemy))
-		combat.feedback.connect(_play_feedback)
+	_hero.weapon_changed.connect(func(weapon: SoulsWeapon) -> void: _set_notice(weapon.display_name))
+	for enemy in _area.enemies():
+		enemy.get_node("Combat").feedback.connect(_play_feedback)
+	_area.enemy_defeated.connect(func(_enemy: Node) -> void:
+		remaining_enemies = _area.remaining
+		_update_status())
+	_area.cleared.connect(_finish.bind(&"victory"))
 	_update_status()
 
 
 func _process(delta: float) -> void:
+	var engaged: bool = outcome == &"" and _area.engaged()
+	Music.set_intensity(2 if engaged else (0 if outcome == &"defeat" else 1))
 	_vitality.value = _hero.health
 	_stamina.value = _hero.stamina
 	_notice_time = maxf(0.0, _notice_time - delta)
@@ -46,7 +51,7 @@ func _process(delta: float) -> void:
 	_opponent_health.visible = enemy != null
 	if enemy != null:
 		var combat: Combatant = enemy.get_node("Combat")
-		_opponent_name.text = CAPTIONS[enemy.role]
+		_opponent_name.text = _area.caption(enemy)
 		_opponent_health.max_value = combat.max_health
 		_opponent_health.value = combat.health
 
@@ -58,28 +63,22 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _visible_opponent() -> Node3D:
-	var marker: Marker3D = $Player/CameraRig.lock_target
-	if is_instance_valid(marker) and marker.is_visible_in_tree():
+	return nearest_opponent($Player, _area)
+
+
+## Locked target if any, else the closest living enemy within 6.5 m.
+static func nearest_opponent(player: Node3D, area: Node3D) -> Node3D:
+	var marker: Marker3D = player.get_node("CameraRig").lock_target
+	if is_instance_valid(marker) and marker.is_visible_in_tree() and marker.get_parent().get_parent() == area.get_node("Enemies"):
 		return marker.get_parent() as Node3D
 	var nearest: Node3D
 	var range_squared := 42.25
-	for enemy in _enemies:
-		var distance: float = enemy.global_position.distance_squared_to(_hero.body.global_position)
+	for enemy in area.enemies():
+		var distance: float = enemy.global_position.distance_squared_to(player.global_position)
 		if enemy.get_node("Combat").health > 0.0 and distance < range_squared:
 			range_squared = distance
 			nearest = enemy
 	return nearest
-
-
-func _enemy_defeated(enemy: CharacterBody3D) -> void:
-	enemy.ai_enabled = false
-	enemy.get_node("LockPoint").hide()
-	enemy.set_deferred("collision_layer", 0)
-	enemy.set_deferred("collision_mask", 1)
-	remaining_enemies -= 1
-	_update_status()
-	if remaining_enemies == 0:
-		_finish(&"victory")
 
 
 func _update_status() -> void:
@@ -91,15 +90,16 @@ func _finish(result: StringName) -> void:
 		return
 	outcome = result
 	$Player.can_fight = false
-	for enemy in _enemies:
+	for enemy in _area.enemies():
 		enemy.ai_enabled = false
 	_audio.play_cue(result, _hero.body.global_position)
 	_result_title.text = "THE RUINS FALL SILENT" if result == &"victory" else "YOU FELL"
 	get_tree().create_timer(0.55).timeout.connect(_result.show)
 
 
-func _play_feedback(cue: StringName, at: Vector3) -> void:
-	_audio.play_cue(cue, at)
+func _play_feedback(cue: StringName, at: Vector3, strength: float = 0.5) -> void:
+	_audio.play_cue(cue, at, strength)
+	$Player.on_world_impact(cue, at, strength)
 	match cue:
 		&"parry": _set_notice("Parried  ·  Counter now")
 		&"guard_break": _set_notice("Guard broken")
