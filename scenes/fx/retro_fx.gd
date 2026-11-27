@@ -54,3 +54,38 @@ func flash(strength: float, color: Color = Color(1.0, 0.55, 0.3)) -> void:
 
 func set_parameter(parameter: StringName, value: Variant) -> void:
 	_material.set_shader_parameter(parameter, value)
+
+
+## Puff of grey-violet dust cells at a world position (feet on a skid, landing, roll end).
+func dust(at: Vector3, amount: int = 10, spread: float = 0.35) -> void:
+	var scene := get_tree().current_scene as Node3D
+	if scene == null:
+		return
+	var particles := CPUParticles3D.new()
+	var cell := BoxMesh.new()
+	cell.size = Vector3(0.07, 0.07, 0.07)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.55, 0.5, 0.58, 0.8)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	cell.material = mat
+	particles.mesh = cell
+	particles.amount = amount
+	particles.lifetime = 0.55
+	particles.one_shot = true
+	particles.explosiveness = 0.9
+	particles.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	particles.emission_sphere_radius = spread
+	particles.direction = Vector3.UP
+	particles.spread = 75.0
+	particles.gravity = Vector3(0, -1.5, 0)
+	particles.initial_velocity_min = 0.4
+	particles.initial_velocity_max = 1.4
+	particles.damping_min = 2.0
+	particles.damping_max = 3.0
+	particles.scale_amount_min = 0.6
+	particles.scale_amount_max = 1.3
+	scene.add_child(particles)
+	particles.global_position = at + Vector3.UP * 0.08
+	particles.emitting = true
+	get_tree().create_timer(0.8).timeout.connect(particles.queue_free)

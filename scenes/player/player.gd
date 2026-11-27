@@ -6,8 +6,15 @@ const COMBAT_PRESSES: Array[StringName] = [&"roll", &"parry", &"heavy_attack", &
 ## Presses are kept this long while an action plays. Long enough to queue the next swing or a
 ## dodge during recovery, short enough that a stale press does not fire after the fact.
 const BUFFER_SECONDS: float = 0.26
-const JUMP_SPEED: float = 3.55
+const JUMP_SPEED: float = 4.4
 const SPRINT_STAMINA_PER_SECOND: float = 13.0
+## Gravity is stronger while falling than while rising: jumps arc quickly and land with weight.
+const RISE_GRAVITY := 1.3
+const FALL_GRAVITY := 1.85
+## A reversal above this speed plants the heels and skids before pushing off the other way.
+const SKID_SPEED := 3.4
+const SKID_TIME := 0.24
+const SKID_BRAKE := 19.0
 
 @export_range(0.1, 12.0, 0.1, "suffix:m/s") var move_speed: float = 4.5
 @export_range(0.1, 12.0, 0.1, "suffix:m/s") var sprint_speed: float = 6.4
@@ -24,9 +31,11 @@ var _buffered_action: StringName
 var _buffer_time: float
 var _roll_backwards: bool
 var _weapon_index: int
-var _lean := Vector2.ZERO
-var _previous_velocity := Vector3.ZERO
 var _was_on_floor := true
+var _air_time: float
+var _skid_time: float
+var _skid_direction := Vector3.ZERO
+var _roll_landed: bool
 
 @onready var _heading: Node3D = $Heading
 @onready var _camera_rig: OrbitCamera = $CameraRig
@@ -77,8 +86,12 @@ func _physics_process(delta: float) -> void:
 			_face_target(target)
 
 	var horizontal := Vector3(velocity.x, 0.0, velocity.z)
+	_update_skid(direction, horizontal, delta)
 	if _combat != null and _combat.contact_frozen:
 		horizontal = Vector3.ZERO
+	elif _skid_time > 0.0:
+		var speed := maxf(0.0, horizontal.length() - SKID_BRAKE * delta)
+		horizontal = _skid_direction * speed
 	elif move_acceleration > 0.0 and (_combat == null or _combat.action != &"roll"):
 		var braking := motion.length_squared() < horizontal.length_squared() or motion.dot(horizontal) < 0.0
 		var rate := move_deceleration if braking and move_deceleration > 0.0 else move_acceleration
@@ -92,20 +105,30 @@ func _physics_process(delta: float) -> void:
 	velocity.x = horizontal.x
 	velocity.z = horizontal.z
 	if not is_on_floor():
-		velocity += get_gravity() * delta
+		velocity += get_gravity() * delta * (RISE_GRAVITY if velocity.y > 0.0 else FALL_GRAVITY)
+		_air_time += delta
+	var falling_speed := -velocity.y
 	move_and_slide()
-	if is_on_floor() and not _was_on_floor and _combat != null:
-		_combat.feedback.emit(&"land", global_position, 0.3)
+	if is_on_floor() and not _was_on_floor:
+		if _air_time > 0.2 and _rig != null:
+			var strength := clampf(falling_speed / 7.0, 0.25, 1.0)
+			_rig.absorb(strength)
+			RetroFX.dust(global_position, int(6 + 10 * strength))
+			if _combat != null:
+				_combat.feedback.emit(&"land", global_position, strength)
+		_air_time = 0.0
 	_was_on_floor = is_on_floor()
 
 	_update_heading(target, direction, delta)
 	if _rig != null:
 		var local_velocity := _heading.global_basis.inverse() * get_real_velocity()
-		var local_motion := Vector2(local_velocity.x, local_velocity.z).limit_length(move_speed) / move_speed
+		# Normalized to walking-to-running speed; a sprint reads above 1 and blends the sprint clip.
+		var local_motion := Vector2(local_velocity.x, local_velocity.z).limit_length(sprint_speed) / move_speed
 		var phase := _combat.pose_phase()
 		if _combat.action == &"roll" and _roll_backwards:
 			phase = 1.0 - phase
-		_update_lean(delta)
+		_rig.track_velocity(get_real_velocity(), delta, _combat.action != &"")
+		_rig.skid = move_toward(_rig.skid, 1.0 if _skid_time > 0.0 else 0.0, delta * 9.0)
 		_rig.apply_motion(_combat.clip(), phase, local_motion, delta)
 
 
@@ -120,18 +143,23 @@ func _update_sprint(direction: Vector3, delta: float) -> void:
 		sprinting = false
 
 
-func _update_lean(delta: float) -> void:
-	var real := get_real_velocity()
-	real.y = 0.0
-	var acceleration := (real - _previous_velocity) / maxf(delta, 0.0001)
-	_previous_velocity = real
-	var local := _heading.global_basis.inverse() * acceleration
-	# Forward is -Z: accelerating forward tips the chest forward, braking rocks it back.
-	var goal := Vector2(local.x, -local.z) * 0.006
-	if _combat != null and _combat.action != &"":
-		goal = Vector2.ZERO
-	_lean = _lean.lerp(goal.limit_length(0.16), 1.0 - exp(-10.0 * delta))
-	_rig.set_lean(_lean)
+## Reversing at a run digs the heels in: the body keeps sliding along its old line while it
+## turns, then pushes off. Short, readable, and the source of the "weight" in a direction change.
+func _update_skid(direction: Vector3, horizontal: Vector3, delta: float) -> void:
+	if _skid_time > 0.0:
+		_skid_time -= delta
+		if _skid_time <= 0.0 and direction.length_squared() > 0.04:
+			velocity += direction.normalized() * 1.6
+		return
+	var busy := _combat != null and _combat.action != &""
+	if busy or not is_on_floor() or horizontal.length() < SKID_SPEED or direction.length_squared() < 0.25:
+		return
+	if direction.normalized().dot(horizontal.normalized()) < -0.35:
+		_skid_time = SKID_TIME
+		_skid_direction = horizontal.normalized()
+		RetroFX.dust(global_position + _skid_direction * 0.3, 14, 0.3)
+		if _combat != null:
+			_combat.feedback.emit(&"skid", global_position, clampf(horizontal.length() / 6.0, 0.3, 1.0))
 
 
 func _combat_motion(motion: Vector3, direction: Vector3, delta: float) -> Vector3:
@@ -153,7 +181,10 @@ func _combat_motion(motion: Vector3, direction: Vector3, delta: float) -> Vector
 				&"heavy_attack": _combat.start_heavy()
 				&"parry": _combat.start_parry()
 				&"jump":
-					var airtime := 2.0 * JUMP_SPEED / get_gravity().length()
+					var g := get_gravity().length()
+					var rise := JUMP_SPEED / (g * RISE_GRAVITY)
+					var height := JUMP_SPEED * JUMP_SPEED / (2.0 * g * RISE_GRAVITY)
+					var airtime := rise + sqrt(2.0 * height / (g * FALL_GRAVITY))
 					if _combat.start_jump(airtime + 0.09):
 						velocity.y = JUMP_SPEED
 				&"roll":
@@ -168,15 +199,24 @@ func _combat_motion(motion: Vector3, direction: Vector3, delta: float) -> Vector
 				_buffered_action = &""
 
 	if _combat.action == &"roll":
+		# Burst, carry, then plant: the last fifth of the roll is the body landing and rising.
 		var age := _combat.action_age
-		var speed := 7.8 * smoothstep(0.0, 0.068, age) * (1.0 - smoothstep(0.28, 0.55, age))
+		var speed := 8.6 * smoothstep(0.0, 0.05, age) * (1.0 - smoothstep(0.24, 0.48, age))
+		if age >= 0.4 and not _roll_landed:
+			_roll_landed = true
+			_rig.absorb(0.35)
+			RetroFX.dust(global_position, 9)
 		return _combat.dodge_direction * speed
+	_roll_landed = false
 	if not can_fight:
 		return Vector3.ZERO
 	return motion * _combat.movement_weight() - _heading.global_basis.z * _combat.lunge_speed()
 
 
 func _update_heading(target: Marker3D, direction: Vector3, delta: float) -> void:
+	if _skid_time > 0.0 and direction.length_squared() > 0.0:
+		_heading.rotation.y = rotate_toward(_heading.rotation.y, atan2(-direction.x, -direction.z), 16.0 * delta)
+		return
 	if _combat != null and (not can_fight or _combat.action != &""):
 		if _combat.action == &"roll" and not _roll_backwards:
 			var dodge := _combat.dodge_direction

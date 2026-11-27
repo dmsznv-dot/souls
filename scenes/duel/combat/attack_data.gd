@@ -20,6 +20,8 @@ extends Resource
 @export_range(0.0, 1.0, 0.01) var chain_point: float = 0.3
 ## Fraction of recovery after which a roll may cancel the rest of the swing.
 @export_range(0.0, 1.0, 0.01) var roll_cancel_point: float = 0.55
+## Light blows landing during windup and strike do not interrupt this attack.
+@export var hyper_armor: bool = false
 
 
 func hit_stop() -> float:

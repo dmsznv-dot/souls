@@ -12,6 +12,10 @@ signal phase_changed(phase: int)
 @export var notice_distance: float = 6.2
 @export var role: StringName = &"watcher"
 @export var boss_enabled: bool
+## Body weight in motion: how fast it gets going, how long it slides to a stop, how fast it turns.
+@export var acceleration: float = 14.0
+@export var deceleration: float = 10.0
+@export_range(0.5, 20.0, 0.1, "suffix:rad/s") var turn_rate: float = 8.0
 
 var boss_phase: int = 1
 
@@ -55,17 +59,27 @@ func _physics_process(delta: float) -> void:
 		_next_thrust = false
 		_combat.start_boss_phase()
 		phase_changed.emit(boss_phase)
-	var motion := -_heading.global_basis.z * _combat.lunge_speed()
+	var lunge := _combat.lunge_speed()
+	var motion := -_heading.global_basis.z * lunge
 	if ai_enabled and is_instance_valid(player) and _combat.action == &"" and not _combat.contact_frozen:
 		motion = _read_player(delta)
-	motion += _combat.push
-	velocity.x = motion.x
-	velocity.z = motion.z
+	var horizontal := Vector3(velocity.x, 0.0, velocity.z)
+	if _combat.contact_frozen:
+		horizontal = Vector3.ZERO
+	elif lunge > 0.0:
+		horizontal = motion
+	else:
+		var braking := motion.length_squared() < horizontal.length_squared() or motion.dot(horizontal) < 0.0
+		horizontal = horizontal.move_toward(motion, (deceleration if braking else acceleration) * delta)
+	horizontal += _combat.push
+	velocity.x = horizontal.x
+	velocity.z = horizontal.z
 	if not is_on_floor():
 		velocity += get_gravity() * delta
 	move_and_slide()
 	var local_velocity := _heading.global_basis.inverse() * get_real_velocity()
 	var local_motion := Vector2(local_velocity.x, local_velocity.z).limit_length(pursuit_speed) / pursuit_speed
+	_rig.track_velocity(get_real_velocity(), delta, _combat.action != &"")
 	_rig.apply_motion(_combat.clip(), _combat.pose_phase(), local_motion, delta)
 
 
@@ -85,7 +99,7 @@ func _read_player(delta: float) -> Vector3:
 		return Vector3.ZERO
 
 	var aim := atan2(-offset.x, -offset.z)
-	_heading.rotation.y = rotate_toward(_heading.rotation.y, aim, 8.0 * delta)
+	_heading.rotation.y = rotate_toward(_heading.rotation.y, aim, turn_rate * delta)
 	_cooldown = maxf(0.0, _cooldown - delta)
 	var definition := _combat.heavy_attack if _next_thrust else _combat.light_attack
 	if boss_phase == 2 and _next_thrust:

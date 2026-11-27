@@ -7,8 +7,24 @@ extends Node3D
 @export_enum("Duelist", "Skeleton") var body_style: int = 0
 ## Held weapon. When empty, the equipment slot picks the matching default.
 @export var weapon: SoulsWeapon
+## Body plan and gait family: how it stands, walks, runs and which clips its actions use.
+@export_enum("Human", "Zombie", "Ghoul", "Brute") var creature: int = 0
 
 const MOTION: AnimationLibrary = preload("res://assets/animations/quaternius_humanoid.res")
+## Retargeted CC0 clips: mocap roll, sprint, hit reactions, death, zombie and crouch gaits.
+const EXTRA: AnimationLibrary = preload("res://assets/animations/quaternius_extra.res")
+enum { HUMAN, ZOMBIE, GHOUL, BRUTE }
+## Portion of a source clip mapped onto an action's 0..1 timeline.
+const CLIP_WINDOWS := {
+	&"mocap_roll": Vector2(0.0, 0.72), &"death": Vector2(0.0, 0.8), &"hit_chest": Vector2(0.0, 1.0),
+	&"zombie_scratch": Vector2(0.08, 0.86), &"melee_hook": Vector2(0.0, 1.0), &"punch_cross": Vector2(0.05, 0.9),
+	&"sword_dash": Vector2(0.1, 0.85), &"spell_shoot": Vector2(0.0, 1.0), &"shield_dash": Vector2(0.05, 0.9),
+}
+## Heel strikes measured on each gait clip (left, right).
+const CONTACTS := {
+	&"walk": Vector2(0.20, 0.60), &"run": Vector2(0.025, 0.55), &"sprint": Vector2(0.02, 0.71),
+	&"zombie_walk": Vector2(0.21, 0.54), &"crouch_walk": Vector2(0.38, 0.81),
+}
 const POSES = preload("res://scenes/characters/duelist_poses.gd")
 const WeaponTrail = preload("res://scenes/combat/weapons/weapon_trail.gd")
 const DEFAULT_WEAPONS: Array[SoulsWeapon] = [
@@ -75,6 +91,10 @@ var blend_remaining := 0.0
 var blend_duration := 0.09
 var last_clip: StringName = &""
 var lean := Vector2.ZERO
+## 0..1 skid on a hard reversal: heels dig in, chest leans back.
+var skid := 0.0
+var _dip := 0.0
+var _last_velocity := Vector3.ZERO
 var cloth: StandardMaterial3D
 var trim: StandardMaterial3D
 var iron: StandardMaterial3D
@@ -128,7 +148,10 @@ func _ready() -> void:
 	_trail.name = "BladeTrail"
 	add_child(_trail)
 	set_weapon(weapon if weapon != null else DEFAULT_WEAPONS[equipment])
-	player.add_animation_library(&"", POSES.create(skeleton))
+	var library := POSES.create(skeleton)
+	for clip in EXTRA.get_animation_list():
+		library.add_animation(clip, EXTRA.get_animation(clip))
+	player.add_animation_library(&"", library)
 	apply_motion(&"locomotion", 0.0, Vector2.ZERO, 0.0)
 
 func _material(html: String, metal := 0.0) -> StandardMaterial3D:
@@ -471,6 +494,41 @@ func _bone_basis(bone_vector: Vector3, toward: Vector3) -> Basis:
 	z = z.normalized()
 	return Basis(y.cross(z), y, z).orthonormalized()
 
+## Action name -> clip, per body plan. Zombies claw, brutes punch, everyone rolls with mocap.
+func _clip_for(action: StringName) -> StringName:
+	match action:
+		&"roll": return &"mocap_roll"
+		&"flinch": return &"hit_head" if creature == BRUTE else &"hit_chest"
+		&"dead": return &"death"
+	match creature:
+		ZOMBIE:
+			if action in [&"enemy_slash", &"enemy_thrust", &"light"]:
+				return &"zombie_scratch"
+		BRUTE:
+			if action == &"enemy_slash": return &"melee_hook"
+			if action == &"enemy_thrust": return &"punch_cross"
+	return action
+
+## Skid and landing crouch layered over whatever the clip produced.
+func _apply_weight(delta: float) -> void:
+	_dip = move_toward(_dip, 0.0, delta * 3.2)
+	if skid > 0.01:
+		for bone_name: String in POSES.SKID:
+			var bone := skeleton.find_bone(bone_name)
+			var goal := Basis.from_euler(POSES.SKID[bone_name] * (PI / 180)).get_rotation_quaternion()
+			skeleton.set_bone_pose_rotation(bone, skeleton.get_bone_pose_rotation(bone).slerp(goal, skid))
+		var pelvis := skeleton.get_bone_pose_position(0)
+		skeleton.set_bone_pose_position(0, pelvis + Vector3(0, -0.09, 0.05) * skid)
+	if _dip > 0.01:
+		var crouch := EXTRA.get_animation(&"crouch_idle")
+		var weight := smoothstep(0.0, 1.0, _dip) * 0.75
+		skeleton.set_bone_pose_position(0, skeleton.get_bone_pose_position(0).lerp(
+				crouch.position_track_interpolate(0, 0.0), weight))
+		for bone_name in ["Pelvis", "ThighL", "ShinL", "FootL", "ThighR", "ShinR", "FootR", "Chest"]:
+			var bone := skeleton.find_bone(bone_name)
+			skeleton.set_bone_pose_rotation(bone, skeleton.get_bone_pose_rotation(bone).slerp(
+					crouch.rotation_track_interpolate(bone + 1, 0.0), weight))
+
 ## The fallen let go: the weapon comes to rest flat on the ground beside the hand.
 func _drop_weapon() -> void:
 	_weapon_dropped = true
@@ -489,14 +547,32 @@ func blade_segment() -> PackedVector3Array:
 		return PackedVector3Array()
 	return PackedVector3Array([_blade_base.global_position, _blade_tip.global_position])
 
-## Leans the upper body into acceleration. x = sideways, y = forward (m/s², smoothed by caller).
+## Leans the upper body into acceleration. x = sideways, y = forward.
 func set_lean(value: Vector2) -> void:
 	lean = value
+
+## Feeds the body's real velocity once per physics step. Acceleration in the facing frame tips
+## the chest: forward into a sprint, back against a hard stop, sideways into a turn.
+func track_velocity(velocity: Vector3, delta: float, busy: bool) -> void:
+	var flat := Vector3(velocity.x, 0.0, velocity.z)
+	var acceleration := (flat - _last_velocity) / maxf(delta, 0.0001)
+	_last_velocity = flat
+	var local := global_basis.inverse() * acceleration
+	var goal := Vector2(local.x, -local.z) * 0.011
+	if busy:
+		goal = Vector2.ZERO
+	lean = lean.lerp(goal.limit_length(0.24), 1.0 - exp(-9.0 * delta))
+
+## Brief crouch that absorbs a landing or the end of a roll. Strength 0..1.
+func absorb(strength: float) -> void:
+	_dip = maxf(_dip, clampf(strength, 0.0, 1.0))
 
 func apply_motion(clip: StringName, phase: float, local_motion: Vector2, delta: float) -> void:
 	if skeleton == null:
 		return
 	phase = clampf(phase, 0.0, 1.0)
+	var action_clip := clip
+	clip = _clip_for(clip)
 	if clip != &"jump" and clip != &"locomotion" and not player.has_animation(clip):
 		clip = &"locomotion"
 	if clip != last_clip:
@@ -519,7 +595,10 @@ func apply_motion(clip: StringName, phase: float, local_motion: Vector2, delta: 
 		&"jump":
 			_jump(phase)
 		_:
-			player.seek(phase,true)
+			var window: Vector2 = CLIP_WINDOWS.get(clip, Vector2(0.0, 1.0))
+			var length := player.get_animation(clip).length
+			player.seek(lerpf(window.x, window.y, phase) * length,true)
+	clip = action_clip
 	if clip == &"dead" and phase > 0.7 and not _weapon_dropped:
 		_drop_weapon()
 	elif clip != &"dead" and _weapon_dropped:
@@ -533,6 +612,7 @@ func apply_motion(clip: StringName, phase: float, local_motion: Vector2, delta: 
 		skeleton.set_bone_pose_position(0,blend_pelvis.lerp(skeleton.get_bone_pose_position(0),weight))
 		for i in skeleton.get_bone_count():
 			skeleton.set_bone_pose_rotation(i,blend_start[i].slerp(skeleton.get_bone_pose_rotation(i),weight))
+	_apply_weight(delta)
 	_drive_arms(clip, phase)
 	if lean != Vector2.ZERO and clip != &"roll" and clip != &"dead":
 		# Upper body tips into acceleration and away from hard stops; capped near 9 degrees.
@@ -571,46 +651,80 @@ func _jump(phase: float) -> void:
 				b.rotation_track_interpolate(i+1,t_b),blend))
 	_set_cape(-15.0 - 17.0 * sin(phase * PI), 0)
 
+## Idle, walk, run and sprint clips for this body plan, plus a cadence multiplier.
+func _gait() -> Dictionary:
+	match creature:
+		ZOMBIE:
+			return {"idle": EXTRA.get_animation(&"zombie_idle"), "walk": EXTRA.get_animation(&"zombie_walk"),
+					"run": EXTRA.get_animation(&"zombie_walk"), "sprint": EXTRA.get_animation(&"zombie_walk"),
+					"names": [&"zombie_walk", &"zombie_walk", &"zombie_walk"], "cadence": 0.55}
+		GHOUL:
+			return {"idle": EXTRA.get_animation(&"crouch_idle"), "walk": EXTRA.get_animation(&"crouch_walk"),
+					"run": EXTRA.get_animation(&"sprint"), "sprint": EXTRA.get_animation(&"sprint"),
+					"names": [&"crouch_walk", &"sprint", &"sprint"], "cadence": 1.15}
+		BRUTE:
+			return {"idle": MOTION.get_animation(&"idle"), "walk": MOTION.get_animation(&"walk"),
+					"run": MOTION.get_animation(&"run"), "sprint": MOTION.get_animation(&"run"),
+					"names": [&"walk", &"run", &"run"], "cadence": 0.7}
+	return {"idle": MOTION.get_animation(&"idle"), "walk": MOTION.get_animation(&"walk"),
+			"run": MOTION.get_animation(&"run"), "sprint": EXTRA.get_animation(&"sprint"),
+			"names": [&"walk", &"run", &"sprint"], "cadence": 1.0}
+
 func _locomote(motion: Vector2, delta: float) -> void:
-	stride = stride.move_toward(motion.limit_length(),delta * 8.0)
+	# motion is velocity over walking-to-running speed: 1 is a full run, above 1 a sprint.
+	stride = stride.move_toward(motion.limit_length(1.45),delta * 8.0)
 	var speed := stride.length()
 	var direction := stride.normalized()
 	var backward := -1.0 if direction.y > .35 else 1.0
+	var gait := _gait()
 	var previous_clock := gait_clock
-	gait_clock = fposmod(gait_clock + backward * delta * (0.46 + speed * 1.48) * smoothstep(0,.12,speed),1.0)
-	var walk := MOTION.get_animation(&"walk")
-	var run := MOTION.get_animation(&"run")
-	var idle := MOTION.get_animation(&"idle")
+	var rate: float = (0.46 + minf(speed, 1.0) * 1.48 + maxf(0.0, speed - 1.0) * 0.9) * gait["cadence"]
+	gait_clock = fposmod(gait_clock + backward * delta * rate * smoothstep(0,.12,speed),1.0)
+	var walk: Animation = gait["walk"]
+	var run: Animation = gait["run"]
+	var sprint: Animation = gait["sprint"]
+	var idle: Animation = gait["idle"]
 	var run_weight := smoothstep(.40,.91,speed)
+	var sprint_weight := smoothstep(1.03,1.3,speed) if backward > 0.0 else 0.0
 	var moving := smoothstep(.01,.34,speed)
 	if speed > 0.18 and _steps != null:
-		# Heel strikes measured on the source clips: walk 0.20 / 0.60, run 0.03 / 0.55.
-		for contact in [lerpf(.20, .025, run_weight), lerpf(.60, .55, run_weight)]:
+		var names: Array = gait["names"]
+		var contacts: Vector2 = CONTACTS[names[0]].lerp(CONTACTS[names[1]], run_weight).lerp(
+				CONTACTS[names[2]], sprint_weight)
+		for contact in [contacts.x, contacts.y]:
 			if _crossed(previous_clock, gait_clock, contact, backward < 0.0):
-				_steps.volume_db = -11.0 + speed * 4.0
+				_steps.volume_db = -11.0 + minf(speed, 1.4) * 4.0
 				_steps.play()
 	var pelvis := walk.position_track_interpolate(0,gait_clock).lerp(
-			run.position_track_interpolate(0,gait_clock),run_weight)
+			run.position_track_interpolate(0,gait_clock),run_weight).lerp(
+			sprint.position_track_interpolate(0,gait_clock),sprint_weight)
 	skeleton.set_bone_pose_position(0,idle.position_track_interpolate(0,breath_clock).lerp(pelvis,moving))
+	var human := creature == HUMAN or creature == BRUTE
 	for i in skeleton.get_bone_count():
 		var track := i + 1
-		var gait := walk.rotation_track_interpolate(track,gait_clock).slerp(
-				run.rotation_track_interpolate(track,gait_clock),run_weight)
+		var pose_gait := walk.rotation_track_interpolate(track,gait_clock).slerp(
+				run.rotation_track_interpolate(track,gait_clock),run_weight).slerp(
+				sprint.rotation_track_interpolate(track,gait_clock),sprint_weight)
 		var still := idle.rotation_track_interpolate(track,breath_clock)
 		var name_string := String(skeleton.get_bone_name(i))
-		var pose := still.slerp(gait,moving)
+		var pose := still.slerp(pose_gait,moving)
 		if name_string.begins_with("Thigh") and absf(direction.x) > .01:
 			# Keep knees forward while the thigh carries each foot sideways across the ground.
 			var swing := pose.get_euler()
 			swing.z += swing.x * direction.x * moving * 0.88
 			swing.x *= lerpf(1.0,.27,direction.x*direction.x)
 			pose = Basis.from_euler(swing).get_rotation_quaternion()
-		elif name_string in ["ArmR","ElbowR","ArmL","ElbowL"]:
+		elif human and name_string in ["ArmR","ElbowR","ArmL","ElbowL"]:
+			# Weapon arms hold their guard; a sprint lets them pump freely.
 			var stance: Vector3 = POSES.STANCE[name_string]
 			var ready := Basis.from_euler(stance * (PI/180)).get_rotation_quaternion()
 			var weapon_arm := name_string.ends_with("R") or equipment == 3
-			pose = ready.slerp(pose,(.25 if weapon_arm else .70) + speed * .23)
+			pose = ready.slerp(pose,minf(1.0,(.25 if weapon_arm else .70) + speed * .23 + sprint_weight * .4))
 		skeleton.set_bone_pose_rotation(i,pose)
+	if creature == GHOUL:
+		var chest := skeleton.find_bone("Chest")
+		skeleton.set_bone_pose_rotation(chest, (Basis(Vector3.RIGHT, -0.45) *
+				Basis(skeleton.get_bone_pose_rotation(chest))).get_rotation_quaternion())
 	# The supporting boot sets the standing height after the change in limb lengths.
 	var sole := INF
 	for foot in ["FootL","FootR"]:
@@ -620,7 +734,7 @@ func _locomote(motion: Vector2, delta: float) -> void:
 	var height := skeleton.get_bone_pose_position(0)
 	height.y -= clampf(sole,-.18,.18) * (1.0 - .40 * run_weight)
 	skeleton.set_bone_pose_position(0,height)
-	_set_cape(-7 - speed * (15 + 6*cos(gait_clock*TAU*2)), stride.x * 7)
+	_set_cape(-7 - minf(speed, 1.4) * (15 + 6*cos(gait_clock*TAU*2)), stride.x * 7)
 
 func _crossed(previous: float, current: float, mark: float, reverse: bool) -> bool:
 	if reverse:

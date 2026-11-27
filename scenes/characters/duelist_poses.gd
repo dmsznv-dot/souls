@@ -34,6 +34,13 @@ const BACKHAND_OUT := {
 	"HandR": Vector3(-24,-26,0), "ArmL": Vector3(22,18,-28), "ElbowL": Vector3(30,0,0),
 	"ThighR": Vector3(24,0,6), "ShinR": Vector3(-34,0,0), "Cape": Vector3(-24,8,16)
 }
+## Hard reversal at a run: lead heel planted ahead, rear knee folded, chest thrown back.
+const SKID := {
+	"Pelvis": Vector3(6,0,0), "Chest": Vector3(16,0,0), "Head": Vector3(-10,0,0),
+	"ThighL": Vector3(40,0,-8), "ShinL": Vector3(-10,0,0), "FootL": Vector3(-18,0,0),
+	"ThighR": Vector3(-6,0,8), "ShinR": Vector3(-62,0,0), "FootR": Vector3(24,0,0),
+	"ArmL": Vector3(35,0,-42), "ElbowL": Vector3(32,0,0), "ArmR": Vector3(20,0,30)
+}
 const DRAW_BACK := {
 	"Chest": Vector3(1,-44,-6), "ArmR": Vector3(-32,-14,23), "ElbowR": Vector3(73,0,0),
 	"HandR": Vector3(-39,41,0), "ArmL": Vector3(48,10,-16), "ElbowL": Vector3(22,0,0)

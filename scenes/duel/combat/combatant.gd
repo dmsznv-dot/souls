@@ -11,10 +11,10 @@ signal weapon_changed(weapon: SoulsWeapon)
 const STAMINA_DELAY: float = 0.65
 const STAMINA_REGEN: float = 24.0
 const BLOCK_FACING: float = 0.5735764 # cos(55°)
-const ROLL_DURATION: float = 0.55
+const ROLL_DURATION: float = 0.62
 ## Invulnerable part of the roll. Dark Souls 1 grants 11-13 of 30 frames on medium and fast
-## rolls; this shorter roll keeps a similar share of its length.
-const ROLL_IFRAMES := Vector2(0.05, 0.33)
+## rolls; this roll keeps a similar share of its length.
+const ROLL_IFRAMES := Vector2(0.05, 0.36)
 const PARRY_DURATION: float = 0.42
 const PARRY_STAGGER: float = 0.98
 const COMBO_RESET: float = 0.45
@@ -26,6 +26,8 @@ const BLADE_SUBSTEPS: int = 4
 @export var weapon: SoulsWeapon
 @export_flags_3d_physics var opponent_mask: int = 4
 @export_range(1.0, 300.0, 1.0) var max_health: float = 100.0
+## Multiplies flinch length. Brutes shrug hits off (below 1), small creatures reel longer.
+@export_range(0.0, 4.0, 0.05) var flinch_scale: float = 1.0
 
 var health: float = 100.0
 var stamina: float = 100.0
@@ -195,6 +197,11 @@ func revive() -> void:
 	_set_action(&"", 0.0)
 
 
+## Hyper armour: the windup and strike of a swing whose attack grants it.
+func hyper_armor() -> bool:
+	return attack != null and attack.hyper_armor and action_age < attack.windup + attack.active
+
+
 func is_invulnerable() -> bool:
 	return action == &"roll" and action_age >= ROLL_IFRAMES.x and action_age <= ROLL_IFRAMES.y
 
@@ -244,11 +251,12 @@ func receive_attack(attacker: Node, incoming: AttackData, shot_source_direction:
 	if posture <= 0.0:
 		posture = 100.0
 		_set_action(&"stagger", 0.82)
-	elif opponent_mask == 4 and action != &"stagger":
-		_set_action(&"stagger", 0.32)
-	elif incoming.impact >= 0.85 and action != &"stagger":
-		# Full-weight blows flinch even the player out of whatever they were doing.
-		_set_action(&"stagger", 0.42)
+	elif hyper_armor():
+		# Committed heavy swings ride through blows (poise), as in Souls games.
+		pass
+	elif action != &"stagger" and (opponent_mask == 4 or incoming.impact * flinch_scale >= 0.85):
+		# The player always flinches; foes flinch once a blow outweighs their poise.
+		_set_action(&"flinch", lerpf(0.3, 0.42, incoming.impact) * clampf(flinch_scale, 0.7, 1.4))
 	return true
 
 
@@ -330,7 +338,7 @@ func _spend(cost: float) -> bool:
 func _damage(amount: float) -> void:
 	health = maxf(0.0, health - amount)
 	if health == 0.0:
-		_set_action(&"dead", 0.80)
+		_set_action(&"dead", 1.4)
 		defeated.emit()
 
 
