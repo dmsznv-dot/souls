@@ -1,18 +1,17 @@
-[gd_resource type="AudioBusLayout" format=3]
+[gd_resource type="AudioBusLayout" format=3 uid="uid://iffbmxftauom"]
 
 [sub_resource type="AudioEffectHardLimiter" id="Limiter"]
 ceiling_db = -0.8
+
+[sub_resource type="AudioEffectLowPassFilter" id="Muffle"]
+cutoff_hz = 20000.0
 
 [sub_resource type="AudioEffectReverb" id="StoneRoom"]
 room_size = 0.62
 damping = 0.55
 spread = 0.8
 hipass = 0.12
-dry = 1.0
 wet = 0.13
-
-[sub_resource type="AudioEffectLowPassFilter" id="Muffle"]
-cutoff_hz = 20000.0
 
 [resource]
 bus/0/effect/0/effect = SubResource("Limiter")
