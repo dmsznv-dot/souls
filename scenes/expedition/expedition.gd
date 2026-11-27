@@ -144,13 +144,8 @@ func _track_zone() -> void:
 
 func _show_ruins_hud() -> void:
 	_hero_caption.text = "OUTER RUINS   /   %d LEFT" % ruins.remaining
-	var enemy := OuterRuins.nearest_opponent($Player, ruins)
-	$Interface/GuardMeters.visible = enemy != null
-	if enemy != null:
-		var combat: Node = enemy.get_node("Combat")
-		_guard_caption.text = ruins.caption(enemy)
-		_guard_hp.max_value = combat.max_health
-		_guard_hp.value = combat.health
+	# Ruins foes carry thin bars over their heads; the top bar is the Gatekeeper's alone.
+	$Interface/GuardMeters.visible = false
 
 
 func _ruins_finish(result: StringName) -> void:

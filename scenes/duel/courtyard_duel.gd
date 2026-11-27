@@ -2,6 +2,7 @@ extends Node3D
 
 const Combatant = preload("res://scenes/duel/combat/combatant.gd")
 const HudUtil = preload("res://scenes/ui/hud_util.gd")
+const FoeBars = preload("res://scenes/ui/foe_bars.gd")
 const NoirLighting = preload("res://scenes/fx/noir_lighting.gd")
 ## Magenta neon fills: the gate's flanking arches and a rim from behind the player's start.
 const ACCENTS := [Vector3(-4.4, 2.4, -10.6), Vector3(4.4, 2.4, -10.6), Vector3(0.0, 4.6, 7.8)]
@@ -45,6 +46,9 @@ func _ready() -> void:
 	RetroFX.prewarm.call_deferred(get_viewport().get_camera_3d())
 	Music.attach_torches(self)
 	_focus = HudUtil.add_focus_bar(_stamina)
+	# The duel opponent and the Gatekeeper keep the large bar at the top of the screen.
+	$Guard.set_meta(&"boss_bar", true)
+	FoeBars.install($Interface)
 	_hero.weapon_changed.connect(func(weapon: SoulsWeapon) -> void: _show_notice(HudUtil.weapon_notice(weapon), 2.2))
 	if not post_victory_path.is_empty():
 		$Guard.phase_changed.connect(_on_boss_phase)

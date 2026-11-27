@@ -23,6 +23,7 @@ func _run() -> void:
 	await _test_response_window()
 	await _test_material()
 	await _test_lock_switch()
+	await _test_bars()
 	print("Poise: %d/%d checks passed." % [_checks - _failures, _checks])
 	quit(0 if _failures == 0 else 1)
 
@@ -169,6 +170,21 @@ func _test_lock_switch() -> void:
 	camera.lock_target = left.get_node("LockPoint")
 	await _ticks(2)
 	_check(camera.lock_target == right.get_node("LockPoint"), "when the locked foe falls the lock moves to the next one")
+
+
+func _test_bars() -> void:
+	await _arena()
+	var guard := current_scene.get_node("Guard")
+	guard.global_position = Vector3(2.0, 0.02, -3.0)
+	guard.get_node("Combat").receive_attack(_hero.get_node("Combat"), LIGHT)
+	var husk := _spawn("husk", Vector3(-1.0, 0, -4.0))
+	await _ticks(3)
+	husk.get_node("Combat").receive_attack(_hero.get_node("Combat"), LIGHT)
+	await process_frame
+	await process_frame
+	var bars: Array = current_scene.get_node("Interface/FoeBars")._bars
+	_check(bars.size() == 1, "a hurt foe shows a thin bar overhead; the duel opponent keeps the top bar (%d bars)" % bars.size())
+	_check(bars.size() == 1 and bars[0][3] > bars[0][2], "the bar trails a chip of the damage just taken")
 
 
 func _lowest(foe: Node3D) -> float:

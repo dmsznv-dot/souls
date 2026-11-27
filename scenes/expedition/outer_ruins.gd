@@ -3,6 +3,7 @@ extends Node3D
 ## same area seamlessly from the Ash Court; this scene keeps it playable and testable alone.
 
 const Combatant = preload("res://scenes/duel/combat/combatant.gd")
+const FoeBars = preload("res://scenes/ui/foe_bars.gd")
 const HudUtil = preload("res://scenes/ui/hud_util.gd")
 
 var remaining_enemies: int
@@ -35,6 +36,7 @@ func _ready() -> void:
 	_hero.defeated.connect(_finish.bind(&"defeat"))
 	_hero.feedback.connect(_play_feedback)
 	_focus = HudUtil.add_focus_bar(_stamina)
+	FoeBars.install($Interface)
 	_hero.weapon_changed.connect(func(weapon: SoulsWeapon) -> void: _set_notice(HudUtil.weapon_notice(weapon)))
 	for enemy in _area.enemies():
 		enemy.get_node("Combat").feedback.connect(_play_feedback)
@@ -53,14 +55,9 @@ func _process(delta: float) -> void:
 	_focus.value = _hero.focus
 	_notice_time = maxf(0.0, _notice_time - delta)
 	_notice.visible = _notice_time > 0.0
-	var enemy := _visible_opponent()
-	_opponent_name.visible = enemy != null
-	_opponent_health.visible = enemy != null
-	if enemy != null:
-		var combat: Combatant = enemy.get_node("Combat")
-		_opponent_name.text = _area.caption(enemy)
-		_opponent_health.max_value = combat.max_health
-		_opponent_health.value = combat.health
+	# Foes carry thin bars over their heads (FoeBars); the top bar is kept for bosses.
+	_opponent_name.visible = false
+	_opponent_health.visible = false
 
 
 func _unhandled_input(event: InputEvent) -> void:
