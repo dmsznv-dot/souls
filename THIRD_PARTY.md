@@ -17,3 +17,7 @@ Kenney created the models below and released all three packs under Creative Comm
 The Modular Dungeon GLBs came from the [aya-assets snapshot](https://github.com/alexan11111/aya-assets/tree/20cbf1b40c4d55f31039cd9c546ebbb4ad99e3d1/kenney/modular-dungeon-kit). Their source filenames have the prefix `modular-dungeon-kit--`. The Graveyard and Prototype files came from the [tge-assets snapshot](https://github.com/Hidencod/tge-assets/tree/e5bd31ec8b339b25d66dd5816a21dd517bd1ae87/packs). The GLBs retain their original embedded colormaps. Godot uses project-authored limestone, aged iron and old bronze materials to match the surrounding ruin.
 
 The ash paving, ruined aqueducts, eclipse shrine, garden walls, horizon and lanterns in `outer_ruins.glb` are original geometry created for this project.
+
+## Audio
+
+All sound effects, ambience and music in `assets/audio/` are original and synthesized from code by `tools/audio/generate_audio.py`. No recorded samples or third-party audio are used.
