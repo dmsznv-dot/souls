@@ -12,6 +12,11 @@ height = 1.5
 [node name="Ghoul" instance=ExtResource("1_guard")]
 collision_mask = 7
 role = &"ghoul"
+evade_chance = 0.5
+punish_chance = 0.8
+backoff_chance = 0.8
+view_angle = 200.0
+circle_distance = 4.5
 title = "CINDER CRAWLER"
 pursuit_speed = 4.4
 notice_distance = 8.5

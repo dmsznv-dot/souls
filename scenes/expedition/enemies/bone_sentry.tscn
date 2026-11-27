@@ -7,6 +7,9 @@
 [node name="BoneSentry" instance=ExtResource("1_guard")]
 collision_mask = 7
 role = &"shield"
+evade_chance = 0.15
+punish_chance = 0.6
+backoff_chance = 0.3
 title = "BONE SENTRY"
 pursuit_speed = 2.6
 notice_distance = 6.0

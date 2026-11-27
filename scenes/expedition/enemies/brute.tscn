@@ -12,6 +12,11 @@ height = 2.6
 [node name="Brute" instance=ExtResource("1_guard")]
 collision_mask = 7
 role = &"brute"
+evade_chance = 0.0
+punish_chance = 0.5
+backoff_chance = 0.0
+token_cost = 2
+view_angle = 120.0
 title = "ASHBOUND BRUTE"
 pursuit_speed = 1.9
 notice_distance = 7.0

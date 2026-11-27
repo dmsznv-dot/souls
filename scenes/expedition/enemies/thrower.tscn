@@ -6,6 +6,8 @@
 [node name="Thrower" instance=ExtResource("1_guard")]
 collision_mask = 7
 role = &"thrower"
+evade_chance = 0.35
+backoff_chance = 0.6
 pursuit_speed = 2.5
 notice_distance = 7.85
 

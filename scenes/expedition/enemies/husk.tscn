@@ -8,6 +8,10 @@
 [node name="Husk" instance=ExtResource("1_guard")]
 collision_mask = 7
 role = &"husk"
+evade_chance = 0.0
+punish_chance = 0.3
+backoff_chance = 0.0
+view_angle = 170.0
 title = "ASH HUSK"
 pursuit_speed = 1.15
 notice_distance = 6.5

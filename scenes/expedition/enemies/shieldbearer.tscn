@@ -6,6 +6,9 @@
 [node name="Shieldbearer" instance=ExtResource("1_guard")]
 collision_mask = 7
 role = &"shield"
+evade_chance = 0.0
+punish_chance = 0.5
+backoff_chance = 0.2
 pursuit_speed = 2.05
 notice_distance = 5.3
 

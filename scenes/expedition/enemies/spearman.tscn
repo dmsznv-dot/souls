@@ -6,6 +6,10 @@
 [node name="Spearman" instance=ExtResource("1_guard")]
 collision_mask = 7
 role = &"spearman"
+evade_chance = 0.3
+punish_chance = 0.7
+backoff_chance = 0.45
+circle_distance = 4.2
 pursuit_speed = 2.6
 notice_distance = 5.7
 
