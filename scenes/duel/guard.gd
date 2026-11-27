@@ -64,6 +64,9 @@ var _has_path: bool
 var _plan: Array = []
 ## Blows thrown in the current string, and the weight of the last one.
 var _blows: int = 0
+var _stuck_time: float
+var _unstick_time: float
+var _unstick_dir := Vector3.ZERO
 var _last_impact: float = 0.0
 var _last_move: StringName
 var _retreat: float
@@ -149,7 +152,7 @@ func _physics_process(delta: float) -> void:
 		motion = _combat.dodge_direction * 7.2 * smoothstep(0.0, 0.05, age) * (1.0 - smoothstep(0.24, 0.48, age))
 		direct = true
 	elif ai_enabled and is_instance_valid(player) and _combat.action == &"" and not _combat.contact_frozen:
-		motion = _think(delta)
+		motion = _unstick(_think(delta), delta)
 	elif ai_enabled and is_instance_valid(player):
 		_track_windup(delta)
 	var leaping := _leap_motion(delta)
@@ -170,11 +173,43 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity += get_gravity() * delta * (1.3 if velocity.y > 0.0 else 1.8)
 	move_and_slide()
+	_watch_progress(motion, delta)
 	var local_velocity := _heading.global_basis.inverse() * get_real_velocity()
 	var local_motion := Vector2(local_velocity.x, local_velocity.z).limit_length(pursuit_speed) / pursuit_speed
 	_rig.guard_up = mode == Mode.HUNT or not ai_enabled
 	_rig.track_velocity(get_real_velocity(), delta, _combat.action != &"")
 	_rig.apply_motion(_combat.clip(), _combat.pose_phase(), local_motion, delta)
+
+
+## Wanting to walk but barely moving (a body or prop in the way the path did not foresee) for
+## a moment sends the foe sideways around it for a second.
+func _watch_progress(wanted: Vector3, delta: float) -> void:
+	var real := get_real_velocity()
+	real.y = 0.0
+	var trying := ai_enabled and _combat.action == &"" and wanted.length() > pursuit_speed * 0.4
+	if trying and real.length() < wanted.length() * 0.25:
+		_stuck_time += delta
+	else:
+		_stuck_time = maxf(0.0, _stuck_time - delta * 2.0)
+	if _stuck_time > 0.6 and _unstick_time <= 0.0:
+		_stuck_time = 0.0
+		_unstick_time = 1.0
+		var side := wanted.normalized().cross(Vector3.UP)
+		if not _clear(side):
+			side = -side
+		elif randf() < 0.5 and _clear(-side):
+			side = -side
+		_unstick_dir = side
+
+
+func _unstick(motion: Vector3, delta: float) -> Vector3:
+	if _unstick_time <= 0.0 or motion.length_squared() < 0.01:
+		return motion
+	_unstick_time -= delta
+	if _unstick_time <= 0.0:
+		# Plan afresh from where the detour ended rather than walking back to a stale waypoint.
+		_has_path = false
+	return (_unstick_dir * 0.85 + motion.normalized() * 0.35).normalized() * motion.length()
 
 
 func _after_action(previous: StringName) -> void:

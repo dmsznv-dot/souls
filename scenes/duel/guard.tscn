@@ -30,7 +30,7 @@ guard_variant = true
 position = Vector3(0, 1.38, 0)
 
 [node name="Navigation" type="NavigationAgent3D" parent="."]
-path_desired_distance = 0.19
+path_desired_distance = 0.5
 target_desired_distance = 0.4
 
 [node name="Combat" type="Node" parent="."]

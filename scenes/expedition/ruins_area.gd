@@ -10,6 +10,10 @@ const Combatant = preload("res://scenes/duel/combat/combatant.gd")
 const DISSOLVE := preload("res://scenes/expedition/gate/gate_dissolve.gdshader")
 const STONE := preload("res://scenes/expedition/gate/court_stone.tres")
 const NoirLighting = preload("res://scenes/fx/noir_lighting.gd")
+const SetDressing = preload("res://scenes/environment/set_dressing.gd")
+const Dressing = preload("res://scenes/expedition/environment/outer_ruins_dressing.gd")
+## Walkable extent of the road, in environment space, for the navigation rebake.
+const NAV_BOUNDS := AABB(Vector3(-8.0, -1.0, -30.6), Vector3(16.0, 6.0, 39.6))
 ## Magenta fills along the road and under the shrine (area space).
 const ACCENTS := [Vector3(-6.4, 2.2, -5.0), Vector3(6.4, 2.2, -14.5), Vector3(-6.4, 2.2, -23.0), Vector3(0.0, 3.2, -28.0)]
 const CAPTIONS := {
@@ -34,6 +38,10 @@ func setup(player: CharacterBody3D, streamed: bool) -> void:
 		$Environment/WorldEnvironment.free()
 		$Environment/EveningLight.free()
 		open_entrance()
+	# Dressing first, so the lighting pass styles its fires and materials; then foes are routed
+	# around everything that now stands on the road.
+	SetDressing.dress($Environment, Dressing.LAYOUT)
+	SetDressing.rebake_navigation($Environment/AqueductWalk, $Environment, NAV_BOUNDS)
 	var accents := []
 	for point: Vector3 in ACCENTS:
 		accents.append(global_transform * point)
