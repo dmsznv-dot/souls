@@ -76,6 +76,8 @@ var _strafe_timer: float
 var _hesitate: float = -1.0
 var _evade_cooldown: float
 var _counter_ready: bool
+## Which branch of the decision made the last move (debug overlay, diagnostics).
+var debug_branch: StringName
 
 @onready var _combat: Combatant = $Combat
 @onready var _heading: Node3D = $Heading
@@ -205,11 +207,14 @@ func _think(delta: float) -> Vector3:
 	var in_cone := distance < 2.0 or facing.angle_to(offset.normalized()) <= deg_to_rad(view_angle * 0.5)
 	var heard := distance < 5.0 and bool(player.get(&"sprinting"))
 	var sees := _visible and distance <= notice_distance * (1.6 if mode == Mode.HUNT else 1.0) and (in_cone or mode == Mode.HUNT)
+	var player_from_post := player.global_position.distance_to(_post)
 	match mode:
 		Mode.IDLE, Mode.RETURN, Mode.SEARCH:
-			if sees or heard:
+			# Hysteresis: a foe heading home only turns back once the player is inside its leash.
+			if (sees or heard) and (boss_enabled or mode != Mode.RETURN or player_from_post < leash * 0.85):
 				_engage()
 			else:
+				debug_branch = &"wander"
 				return _wander(delta)
 	if sees:
 		_last_seen = player.global_position
@@ -221,7 +226,7 @@ func _think(delta: float) -> Vector3:
 			_search_time = 0.0
 			_director_release()
 			return Vector3.ZERO
-	if not boss_enabled and global_position.distance_to(_post) > leash:
+	if not boss_enabled and global_position.distance_to(_post) > leash and player_from_post > leash * 0.9:
 		mode = Mode.RETURN
 		_director_release()
 		return Vector3.ZERO
@@ -232,6 +237,7 @@ func _think(delta: float) -> Vector3:
 	var away := -offset.normalized()
 	if _retreat > 0.0:
 		_retreat -= delta
+		debug_branch = &"retreat"
 		return away * pursuit_speed * 0.9 if _clear(away) else Vector3.ZERO
 	if _backstep > 0.0:
 		_backstep -= delta
@@ -250,11 +256,19 @@ func _think(delta: float) -> Vector3:
 	if may_attack and not _has_token():
 		may_attack = Director.request(self, token_cost, opening or _counter_ready)
 	if not may_attack:
+		debug_branch = &"circle"
 		return _circle(distance, definition, delta)
 	var stop_distance := definition.reach - 0.55
 	if distance > stop_distance or not _visible:
+		# The last few metres in plain sight are walked straight: a navmesh path can end short of
+		# a player standing at its edge, which used to leave foes waiting just out of reach.
+		if _visible and distance < 6.0 and _clear(offset.normalized()):
+			debug_branch = &"close_in"
+			return offset.normalized() * pursuit_speed
+		debug_branch = &"path"
 		return _navigate_to(player.global_position)
 	_has_path = false
+	debug_branch = &"in_range"
 	if _hesitate < 0.0:
 		# A beat of reaction time before committing; openings and counters skip it.
 		_hesitate = 0.0 if opening or _counter_ready or boss_enabled else randf_range(0.0, 0.3)
@@ -310,9 +324,9 @@ func _circle(distance: float, definition: DuelAttack, delta: float) -> Vector3:
 		return _navigate_to(player.global_position)
 	_strafe_timer -= delta
 	if _strafe_timer <= 0.0:
-		_strafe_timer = randf_range(1.0, 2.6)
 		var roll := randf()
-		_strafe_dir = 0.0 if roll < 0.2 else (1.0 if roll < 0.6 else -1.0)
+		_strafe_dir = 0.0 if roll < 0.1 else (1.0 if roll < 0.55 else -1.0)
+		_strafe_timer = randf_range(0.4, 0.8) if _strafe_dir == 0.0 else randf_range(1.2, 2.6)
 	var toward := (player.global_position - global_position)
 	toward.y = 0.0
 	toward = toward.normalized()
@@ -370,6 +384,10 @@ func _track_windup(delta: float) -> void:
 
 
 func _on_own_feedback(cue: StringName, _at: Vector3, _strength: float) -> void:
+	# Being struck always starts a fight, even from behind or mid-search.
+	if cue in [&"hit", &"block", &"guard_break"] and ai_enabled and is_instance_valid(player) and _combat.health > 0.0:
+		_engage()
+		_last_seen = player.global_position
 	if cue == &"block" and role == &"shield" and randf() < 0.6:
 		_counter_ready = true
 		_cooldown = 0.0

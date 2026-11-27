@@ -18,6 +18,8 @@ func _run() -> void:
 	await _test_alarm()
 	await _test_evasion_and_tracking()
 	await _test_search()
+	await _test_leash()
+	await _test_starvation()
 	print("AI: %d/%d checks passed." % [_checks - _failures, _checks])
 	quit(0 if _failures == 0 else 1)
 
@@ -126,6 +128,44 @@ func _test_search() -> void:
 	_check(husk.mode == husk.Mode.SEARCH, "a foe that loses the player for 2.5 s searches its last position")
 	await _ticks(340)
 	_check(husk.mode in [husk.Mode.RETURN, husk.Mode.IDLE], "after five fruitless seconds it heads back to its post")
+
+
+func _test_leash() -> void:
+	await _arena()
+	_hero.global_position = Vector3(0.0, 0.02, 4.0)
+	var husk := _spawn("husk", Vector3(0, 0, -4.0), true)
+	husk.leash = 5.0
+	husk.notice_distance = 14.0
+	await _ticks(1)
+	# Its post lies beyond the player: walking home leads it straight at the player in view.
+	husk._post = _hero.global_position + Vector3(0, 0, 6.0)
+	var start := husk.global_position
+	for i in 300:
+		await physics_frame
+	var moved := husk.global_position.distance_to(start)
+	_check(moved > 1.5, "a foe beyond its leash walks home instead of freezing in place (moved %.1f m)" % moved)
+
+
+func _test_starvation() -> void:
+	await _arena()
+	var brute := _spawn("brute", Vector3(0, 0, -2.6), true)
+	for i in 6:
+		var angle := TAU * i / 6.0 + 0.4
+		var quick := _spawn("ghoul", Vector3(sin(angle), 0, cos(angle)) * 2.0, true)
+		quick.retreat_after_attack = 0.0
+		quick.attack_rest = 0.1
+	# Longest stretch without an attack from the brute over half a minute of crowding.
+	var since := 0
+	var longest := 0
+	for i in 1800:
+		await physics_frame
+		_hero.get_node("Combat").health = 100.0
+		if brute.get_node("Combat").attack != null:
+			since = 0
+		else:
+			since += 1
+			longest = maxi(longest, since)
+	_check(longest < 600, "a heavy that needs two tokens keeps getting turns among quick foes (longest wait %.1f s)" % (longest / 60.0))
 
 
 func _arena() -> void:
