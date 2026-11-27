@@ -19,4 +19,4 @@ blade_half_width = 0.024
 dead_length = 0.05
 mass = 0.8
 trail_color = Color(0.95, 0.93, 0.85, 0.45)
-hint = "Three quick cuts · strikes to the back deal x2.5"
+hint = "Quick cuts · x2.5 to the back"

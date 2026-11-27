@@ -17,4 +17,4 @@ static func add_focus_bar(stamina: ProgressBar) -> ProgressBar:
 
 
 static func weapon_notice(weapon: SoulsWeapon) -> String:
-	return weapon.display_name + ("\n" + weapon.hint if not weapon.hint.is_empty() else "")
+	return weapon.display_name + ("  ·  " + weapon.hint if not weapon.hint.is_empty() else "")

@@ -19,4 +19,4 @@ blade_half_width = 0.05
 dead_length = 0.7
 mass = 2.0
 trail_color = Color(0.66, 0.58, 1, 0.5)
-hint = "Focus: ember bolts and an ash nova · bonks when spent"
+hint = "Focus: ember bolts · heavy nova"

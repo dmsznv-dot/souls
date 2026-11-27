@@ -18,4 +18,4 @@ dead_length = 0.72
 mass = 11.0
 two_handed = true
 trail_color = Color(0.8, 0.75, 0.7, 0.5)
-hint = "Crushes guards · heavy slams a shockwave"
+hint = "Crushes guards · heavy shockwave"

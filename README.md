@@ -6,9 +6,9 @@ Souls is an early-stage 3D soulslike prototype built in Godot 4.7.2 with GDScrip
 
 One test arena, one weapon, and one boss. The prototype will test lock-on camera behavior, dodge input buffering, stamina, and attack timing. The first boss will use distinct windups and punish windows so players can learn when to dodge, reposition, or counterattack.
 
-Souls 0.4 opens in the Ash Court against the Ash Gatekeeper, who now swings a greatsword. Read his sweep and thrust in the first phase. Below half health he finishes his current move and adds a follow-up overhead strike. Defeat him, approach the gate and press **E** or **A**: the seal burns away and a short bridge leads straight into the Outer Ruins. Nothing loads; the ruins stream in during the boss fight. The spearman, shieldbearer and cinder thrower guard the road to the shrine. If you fall in the ruins, **T** or **Menu** raises you at their entrance with the guards restored, and the Gatekeeper stays defeated.
+Souls 0.5 opens in the Ash Court against the Ash Gatekeeper. He reads your distance and his phase, never repeats a move back to back and mixes cuts, a three-blow string, a delayed overhead that punishes early rolls, a charging thrust after a backstep and a leaping slam with a landing shockwave; below half health he adds a full spin and a fan of ash bolts. Defeat him, approach the gate and press **E** or **A**: the seal burns away and a short bridge leads straight into the Outer Ruins. Nothing loads; the ruins stream in during the boss fight. Eight foes of six kinds hold the road to the shrine: the spearman, shieldbearer and cinder thrower, slow ash husks, a fast cinder crawler that pounces and backs off, a bone sentry, and the ashbound brute, whose slam shakes the ground. If you fall in the ruins, **T** or **Menu** raises you at their entrance with the foes restored, and the Gatekeeper stays defeated.
 
-The hero is an armoured skeleton carrying three weapons. Each weapon has its own mass, reach and swing timing. Hits come from the blade itself: the striking edge is swept between physics steps and tested against each body, so a short blade misses where a greatsword connects. Light attacks chain into a return cut, a buffered dodge cancels late recovery, and full-weight blows shove and flinch.
+The hero is an armoured skeleton carrying six very different weapons. Hits come from the weapon itself: the striking edge is swept between physics steps and tested against each body, so a short blade misses where a greatsword connects. Movement has weight: rolls burst, carry and land in a crouch, a reversal at a run skids before pushing off, falls land hard, and foes accelerate, brake and turn at their own rates.
 
 The controller test arena and the shorter training duel are available in `scenes/arena/` and `scenes/duel/`. The ruins can also be played alone from `scenes/expedition/outer_ruins.tscn`.
 
@@ -39,11 +39,16 @@ Press **Esc** to release the mouse cursor. Left-click the game window to capture
 
 Heavy attacks deal more posture damage. A frontal parry interrupts a melee attack and makes the first follow-up strike hit harder. The shieldbearer opens up during an attack. Cover can intercept the thrower's visible bolts. Press **F2** in the Ash Court to inspect attack arcs, phases, and queued input.
 
-| Weapon | Mass | Character |
-| --- | --- | --- |
-| Ashen Longsword | 3 kg | Balanced default. Reaches about 2.0 m centre to centre. |
-| Pilgrim Shortsword | 1.6 kg | Fastest recovery, earliest cancels, about 1.8 m reach. |
-| Gatebreaker Greatsword | 9 kg | Two-handed, slow and committed, about 2.8 m reach, long hit-stop, staggers on heavy blows. |
+| Weapon | Mass | Speed and damage | Twist |
+| --- | --- | --- | --- |
+| Ashen Longsword | 3 kg | Balanced, slash | Heavy breaks posture |
+| Ashen Tachi | 1.9 kg | Fast and long, slash | Heavy is a dashing draw cut |
+| Gatebreaker Greatsword | 9 kg | Slow, huge, slash | Hyper armour; hold heavy to charge up to +60 % |
+| Bone Shiv | 0.8 kg | Fastest, short, pierce | Three-cut flurry, lunging pounce, x2.5 to the back |
+| Bellbreaker | 11 kg | Slowest, impact | Crushes guards; heavy slams a shockwave |
+| Ember Staff | 2 kg | Magic | Spends focus on homing ember bolts and an ash nova; bonks without focus |
+
+Foes take more or less damage from slash, pierce, impact and magic depending on their armour. Hold the heavy button to charge weapons that allow it; the blue bar is focus and refills slowly.
 
 Weapons live in `scenes/combat/weapons/` as `SoulsWeapon` resources: blade length, grip, mass and the light chain and heavy attack. Attack resources expose timing, damage, posture, AI engagement distance, impact weight and the chain and roll-cancel points in the Inspector. Sword arms follow authored blade paths (`SWINGS` in `scenes/characters/duelist_rig.gd`) through two-bone IK, so the edge crosses the space in front of the body while hits can land.
 
@@ -51,7 +56,7 @@ Weapons live in `scenes/combat/weapons/` as `SoulsWeapon` resources: blade lengt
 
 `scenes/fx/` holds the presentation: a post-process that resamples the frame on a coarse pixel grid, posterizes it through a 4x4 Bayer dither and adds animated grain, and a shared dense dusk fog for both areas. Gradients in the fog and sky break into dithered bands.
 
-Every sound and music stem is synthesized by `tools/audio/generate_audio.py`. The Ash Court plays a D minor dungeon synth score and the Outer Ruins a D Dorian medieval tune on drone, lute and recorder. Each area has three sample-aligned stems that fade with combat intensity and crossfade when you cross the bridge. To regenerate the audio:
+Every sound and music stem is synthesized by `tools/audio/generate_audio.py`. The Ash Court explores to a D minor dungeon synth score and the Outer Ruins to a D Dorian medieval tune on drone, lute and recorder. When a foe notices you a stinger hits and the area's own combat theme starts: the Gatekeeper's D minor theme gains a choir in his second phase, and the ruins fight is a driving dungeon synth arrangement. Scores crossfade when you cross the bridge. To regenerate the audio:
 
 ```sh
 pip install numpy scipy soundfile
@@ -65,6 +70,8 @@ godot --headless --path . --script res://tests/stage_one.gd
 godot --headless --path . --script res://tests/duel.gd
 godot --headless --path . --script res://tests/expedition.gd
 godot --headless --path . --script res://tests/weapons.gd
+godot --headless --path . --script res://tests/foes.gd
+godot --headless --path . --script res://tests/music.gd
 ```
 
 The courtyard, duelist and skeleton meshes, weapons, sounds and music were created for this project. [Motion sources](docs/motion-sources.md) describes the retargeted Quaternius clips. [Third-party assets](THIRD_PARTY.md) lists the Kenney models and their license. Development skills and their license are in `.agents/skills/`.

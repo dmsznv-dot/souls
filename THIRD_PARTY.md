@@ -2,7 +2,7 @@
 
 ## Animation
 
-Six clips from Quaternius Universal Animation Library Standard are retargeted in `assets/animations/quaternius_humanoid.res` under CC0 1.0 Universal. [Motion sources](docs/motion-sources.md) lists the clips, the original and mirrored sources, and the license.
+Six clips from Quaternius Universal Animation Library Standard are retargeted in `assets/animations/quaternius_humanoid.res`, and 22 further clips from Universal Animation Library Standard and Universal Animation Library 2 Standard in `assets/animations/quaternius_extra.res`, all under CC0 1.0 Universal. [Motion sources](docs/motion-sources.md) lists the clips, the original and mirrored sources, and the license.
 
 ## Environment
 
