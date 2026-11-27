@@ -18,11 +18,18 @@ func launch(thrower: Node, attack: AttackData, origin: Vector3, direction: Vecto
 	_distance_left = attack.reach
 	global_position = origin
 	look_at(origin + direction)
+	var magic := attack.damage_type == DuelAttack.DamageType.MAGIC
 	var glow := StandardMaterial3D.new()
 	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	glow.albedo_color = Color(1.0, 0.62, 0.25)
+	glow.albedo_color = Color(0.66, 0.58, 1.0) if magic else Color(1.0, 0.62, 0.25)
 	var bolt := BoxMesh.new()
-	bolt.size = Vector3(0.05, 0.05, 0.86)
+	bolt.size = Vector3(0.16, 0.16, 0.42) if magic else Vector3(0.05, 0.05, 0.86)
+	if magic:
+		var halo := OmniLight3D.new()
+		halo.light_color = glow.albedo_color
+		halo.light_energy = 1.4
+		halo.omni_range = 2.6
+		add_child(halo)
 	bolt.material = glow
 	var model := MeshInstance3D.new()
 	model.mesh = bolt

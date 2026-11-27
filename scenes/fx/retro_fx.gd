@@ -89,3 +89,31 @@ func dust(at: Vector3, amount: int = 10, spread: float = 0.35) -> void:
 	particles.global_position = at + Vector3.UP * 0.08
 	particles.emitting = true
 	get_tree().create_timer(0.8).timeout.connect(particles.queue_free)
+
+
+## Flat ring that races outward from a slam or a nova, then fades.
+func shockwave(at: Vector3, radius: float, color: Color = Color(1.0, 0.62, 0.3)) -> void:
+	var scene := get_tree().current_scene as Node3D
+	if scene == null:
+		return
+	var ring := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.82
+	torus.outer_radius = 1.0
+	torus.rings = 24
+	torus.ring_segments = 4
+	ring.mesh = torus
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = color
+	ring.material_override = mat
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	scene.add_child(ring)
+	ring.global_position = Vector3(at.x, at.y + 0.1, at.z)
+	ring.scale = Vector3(0.2, 0.25, 0.2)
+	var tween := ring.create_tween()
+	tween.tween_property(ring, ^"scale", Vector3(radius, 0.25, radius), 0.28).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	tween.parallel().tween_property(mat, ^"albedo_color:a", 0.0, 0.4)
+	tween.tween_callback(ring.queue_free)
+	dust(at, 18, radius * 0.5)

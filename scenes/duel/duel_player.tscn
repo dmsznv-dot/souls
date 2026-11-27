@@ -7,13 +7,16 @@
 [ext_resource type="Resource" path="res://scenes/duel/combat/heavy.tres" id="5_heavy"]
 [ext_resource type="Script" path="res://scenes/combat/weapons/weapon_data.gd" id="6_weapon"]
 [ext_resource type="Resource" path="res://scenes/combat/weapons/longsword.tres" id="7_long"]
-[ext_resource type="Resource" path="res://scenes/combat/weapons/shortsword.tres" id="8_short"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/katana.tres" id="8_katana"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/dagger.tres" id="10_dagger"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/hammer.tres" id="11_hammer"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/staff.tres" id="12_staff"]
 [ext_resource type="Resource" path="res://scenes/combat/weapons/greatsword.tres" id="9_great"]
 
 [node name="Player" instance=ExtResource("1_player")]
 move_acceleration = 38.0
 move_deceleration = 24.0
-weapons = Array[ExtResource("6_weapon")]([ExtResource("7_long"), ExtResource("8_short"), ExtResource("9_great")])
+weapons = Array[ExtResource("6_weapon")]([ExtResource("7_long"), ExtResource("8_katana"), ExtResource("9_great"), ExtResource("10_dagger"), ExtResource("11_hammer"), ExtResource("12_staff")])
 
 [node name="Cloak" parent="Heading" index="0"]
 visible = false
@@ -41,5 +44,6 @@ lock_yaw_offset = 0.30
 
 [node name="Combat" type="Node" parent="." index="4"]
 script = ExtResource("3_combat")
+armor = &"bone"
 light_attack = ExtResource("4_light")
 heavy_attack = ExtResource("5_heavy")

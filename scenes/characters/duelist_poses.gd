@@ -133,6 +133,11 @@ static func create(skeleton: Skeleton3D) -> AnimationLibrary:
 			[.68,follow_slash,Vector3(-.045,-.092,-.081)],[1,{}]])
 	_add(lib,skeleton,&"boss_phase",[[0,{}],[.22,OATH,-.102],[.41,OATH,-.125],
 			[.65,CHALLENGE,.025],[.79,CHALLENGE,.012],[.93,DEFEND,-.055],[1,{}]])
+	# Body timelines shared by attacks whose blade paths are aliased in the rig.
+	for alias: Array in [[&"stab", &"enemy_thrust"], [&"light_c", &"enemy_thrust"], [&"cast", &"enemy_thrust"],
+			[&"dash_slash", &"light"], [&"slam", &"heavy"], [&"nova", &"heavy"], [&"spin_slash", &"light"],
+			[&"leap_slam", &"heavy"]]:
+		lib.add_animation(alias[0], lib.get_animation(alias[1]))
 	_add(lib,skeleton,&"block",[[0,{}],[.4,DEFEND,-.035],[1,DEFEND,-.035]])
 	_add(lib,skeleton,&"parry",[[0,{}],[.22,DEFEND],[.51,PARRY_OUT],[.66,PARRY_OUT],[1,{}]])
 	_add(lib,skeleton,&"stagger",[[0,{}],[.20,RECOIL,-.065],[.48,RECOIL,-.065],[1,{}]])

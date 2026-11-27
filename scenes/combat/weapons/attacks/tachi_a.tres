@@ -4,17 +4,17 @@
 
 [resource]
 script = ExtResource("1")
-clip = &"light_b"
-windup = 0.13
+clip = &"light"
+windup = 0.12
 active = 0.09
-recovery = 0.24
-damage = 14.0
-stamina_cost = 11.0
-block_cost = 13.0
+recovery = 0.22
+damage = 16.0
+stamina_cost = 12.0
+block_cost = 14.0
 posture_damage = 18.0
-reach = 1.7
-arc = 104.0
+reach = 2.05
+arc = 110.0
 lunge_speed = 1.9
-impact = 0.22
+impact = 0.28
 chain_point = 0.2
 roll_cancel_point = 0.4

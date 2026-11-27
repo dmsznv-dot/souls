@@ -18,3 +18,4 @@ blade_half_width = 0.034
 dead_length = 0.12
 mass = 3.0
 trail_color = Color(0.95, 0.88, 0.76, 0.55)
+hint = "Balanced · heavy breaks posture"

@@ -21,16 +21,17 @@ func _run() -> void:
 	await _test_chain_and_cancels()
 	await _test_weight()
 	await _test_switching()
+	await _test_specials()
 	print("Weapons: %d/%d checks passed." % [_checks - _failures, _checks])
 	quit(0 if _failures == 0 else 1)
 
 
 func _test_reach() -> void:
-	# Weapon order on the player: longsword, shortsword, greatsword.
-	await _arena(2.3, 1)
+	# Weapon order on the player: longsword, katana, greatsword, dagger, hammer, staff.
+	await _arena(2.3, 3)
 	_hero.start_light()
 	await _ticks(80)
-	_check(_foe.health == 100.0, "shortsword cannot reach a foe 2.3 m away")
+	_check(_foe.health == 100.0, "the dagger cannot reach a foe 2.3 m away")
 	await _arena(2.3, 0)
 	_hero.start_heavy()
 	await _ticks(90)
@@ -108,13 +109,74 @@ func _test_switching() -> void:
 	await _arena(4.0, 0)
 	_key(KEY_TAB)
 	await _ticks(2)
-	_check(_hero.weapon.form == SoulsWeapon.Form.SHORTSWORD, "Tab switches to the next weapon")
+	_check(_hero.weapon.form == SoulsWeapon.Form.KATANA, "Tab switches to the next weapon")
 	_hero.start_light()
 	await _ticks(2)
 	_key(KEY_TAB)
 	await _ticks(2)
-	_check(_hero.weapon.form == SoulsWeapon.Form.SHORTSWORD, "no switching in the middle of a swing")
+	_check(_hero.weapon.form == SoulsWeapon.Form.KATANA, "no switching in the middle of a swing")
 	_check(_hero.rig.weapon == _hero.weapon, "the rig holds the equipped weapon")
+
+
+func _test_specials() -> void:
+	# Bone Shiv: a stab in the back lands for x2.5.
+	await _arena(1.3, 3)
+	_hero.start_light()
+	await _ticks(30)
+	var front_damage: float = 100.0 - _foe.health
+	await _arena(1.3, 3)
+	_guard.get_node("Heading").rotation.y = 0.0
+	_hero.start_light()
+	await _ticks(30)
+	var back_damage: float = 100.0 - _foe.health
+	_check(front_damage > 0.0 and is_equal_approx(back_damage, front_damage * 2.5),
+		"the dagger's backstab deals x2.5 (%.0f vs %.0f)" % [back_damage, front_damage])
+
+	# Gatebreaker: a held heavy charges past its windup and hits harder.
+	await _arena(2.2, 2)
+	_hero.start_heavy()
+	await _ticks(110)
+	var quick: float = 100.0 - _foe.health
+	await _arena(2.2, 2)
+	Input.action_press(&"heavy_attack")
+	_hero.start_heavy()
+	await _ticks(150)
+	Input.action_release(&"heavy_attack")
+	await _ticks(20)
+	var charged: float = 100.0 - _foe.health
+	_check(charged > quick * 1.4, "a fully charged greatsword heavy hits harder (%.0f vs %.0f)" % [charged, quick])
+
+	# Hyper armour: the greatsword's swing rides through a blow.
+	await _arena(1.8, 2)
+	_hero.start_light()
+	await _ticks(8)
+	_foe.receive_attack(_foe, _foe.light_attack)
+	await _ticks(2)
+	_check(_hero.action == &"light", "a greatsword swing is not interrupted by a light blow")
+
+	# Bellbreaker: the slam's shockwave catches a second foe off to the side.
+	await _arena(1.6, 4)
+	var second: CharacterBody3D = load("res://scenes/duel/guard.tscn").instantiate()
+	second.ai_enabled = false
+	current_scene.add_child(second)
+	second.global_position = Vector3(1.9, 0.02, -1.9)
+	await _ticks(3)
+	_hero.start_heavy()
+	await _ticks(110)
+	_check(_foe.health < 100.0 and second.get_node("Combat").health < 100.0,
+		"the hammer slam's shockwave hits a second foe")
+
+	# Ember Staff: bolts spend focus and hit at range; without focus it bonks.
+	await _arena(7.0, 5)
+	_hero.start_light()
+	var focus_after_cast: float = _hero.focus
+	await _ticks(60)
+	_check(focus_after_cast <= 88.0 and _foe.health < 100.0, "an ember bolt spends focus and hits 7 m away")
+	await _arena(1.6, 5)
+	_hero.focus = 2.0
+	_hero.start_light()
+	_check(_hero.attack != null and _hero.attack.damage_type == DuelAttack.DamageType.IMPACT,
+		"without focus the staff falls back to a bonk")
 
 
 func _count_frozen() -> int:

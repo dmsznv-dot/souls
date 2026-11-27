@@ -169,6 +169,8 @@ func _combat_motion(motion: Vector3, direction: Vector3, delta: float) -> Vector
 		elif Input.is_action_just_pressed(&"heavy_trigger"):
 			_buffer(&"heavy_attack")
 	_combat.blocking = can_fight and _combat.action == &"" and not sprinting and Input.is_action_pressed(&"block")
+	_combat.charging = Input.is_action_pressed(&"heavy_attack") or Input.is_action_pressed(&"heavy_trigger")
+	_combat.aim_target = _camera_rig.lock_target
 	_combat.advance(delta)
 	if not can_fight:
 		_buffered_action = &""
@@ -264,6 +266,9 @@ func on_world_impact(cue: StringName, location: Vector3, strength: float) -> voi
 		&"hit", &"death": base = lerpf(0.22, 0.6, strength)
 		&"block": base = lerpf(0.12, 0.32, strength)
 		&"guard_break": base = 0.55
+		&"shockwave": base = 0.6
+		&"nova": base = 0.4
+		&"skid": base = 0.06
 		&"parry": base = 0.3
 		&"land": base = 0.12
 		&"heavy": base = 0.08 * strength

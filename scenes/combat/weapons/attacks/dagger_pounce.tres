@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="DuelAttack" format=3]
+
+[ext_resource type="Script" path="res://scenes/duel/combat/attack_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+clip = &"stab"
+windup = 0.16
+active = 0.1
+recovery = 0.3
+damage = 15.0
+stamina_cost = 14.0
+block_cost = 14.0
+posture_damage = 16.0
+reach = 2.4
+arc = 40.0
+lunge_speed = 6.0
+impact = 0.3
+chain_point = 0.3
+roll_cancel_point = 0.35
+damage_type = 1
+backstab_multiplier = 2.5

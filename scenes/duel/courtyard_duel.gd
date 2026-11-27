@@ -1,6 +1,7 @@
 extends Node3D
 
 const Combatant = preload("res://scenes/duel/combat/combatant.gd")
+const HudUtil = preload("res://scenes/ui/hud_util.gd")
 const GATE_DISTANCE := 2.45
 
 @export_file("*.tscn") var post_victory_path: String
@@ -9,6 +10,7 @@ var outcome: StringName
 var _debug_enabled: bool
 var _notice_time: float
 var _reset_requested: bool
+var _focus: ProgressBar
 
 @onready var _hero: Combatant = $Player/Combat
 @onready var _guard: Combatant = $Guard/Combat
@@ -34,7 +36,8 @@ func _ready() -> void:
 	_guard_hp.max_value = _guard.max_health
 	Music.play_area(&"court", 1.5)
 	Music.attach_torches(self)
-	_hero.weapon_changed.connect(func(weapon: SoulsWeapon) -> void: _show_notice(weapon.display_name, 1.2))
+	_focus = HudUtil.add_focus_bar(_stamina)
+	_hero.weapon_changed.connect(func(weapon: SoulsWeapon) -> void: _show_notice(HudUtil.weapon_notice(weapon), 2.2))
 	if not post_victory_path.is_empty():
 		$Guard.phase_changed.connect(_on_boss_phase)
 		$Interface/GuardMeters/Caption.text = "THE ASH GATEKEEPER"
@@ -45,6 +48,7 @@ func _process(delta: float) -> void:
 	_update_music()
 	_player_hp.value = _hero.health
 	_stamina.value = _hero.stamina
+	_focus.value = _hero.focus
 	_guard_hp.value = _guard.health
 	_posture.value = _guard.posture
 	_notice_time = maxf(0.0, _notice_time - delta)
@@ -120,6 +124,14 @@ func _on_feedback(cue: StringName, location: Vector3, strength: float = 0.5) -> 
 			_sparks(location, Color(1.0, 0.80, 0.41), 9)
 		&"hit":
 			_sparks(location, Color(1.0, 0.64, 0.42), 7)
+		&"shockwave":
+			RetroFX.shockwave(location, 3.0)
+		&"nova":
+			RetroFX.shockwave(location, 2.8, Color(0.66, 0.58, 1.0))
+		&"critical":
+			_show_notice("Critical", 0.8)
+		&"no_focus":
+			_show_notice("Not enough focus")
 
 
 func _show_notice(message: String, duration: float = 0.85) -> void:

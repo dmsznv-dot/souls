@@ -3,11 +3,13 @@ extends Node3D
 ## same area seamlessly from the Ash Court; this scene keeps it playable and testable alone.
 
 const Combatant = preload("res://scenes/duel/combat/combatant.gd")
+const HudUtil = preload("res://scenes/ui/hud_util.gd")
 
 var remaining_enemies: int
 var outcome: StringName
 var _notice_time: float
 var _retry_pending: bool
+var _focus: ProgressBar
 
 @onready var _area: Node3D = $Area
 @onready var _hero: Combatant = $Player/Combat
@@ -29,7 +31,8 @@ func _ready() -> void:
 	Music.attach_torches(self)
 	_hero.defeated.connect(_finish.bind(&"defeat"))
 	_hero.feedback.connect(_play_feedback)
-	_hero.weapon_changed.connect(func(weapon: SoulsWeapon) -> void: _set_notice(weapon.display_name))
+	_focus = HudUtil.add_focus_bar(_stamina)
+	_hero.weapon_changed.connect(func(weapon: SoulsWeapon) -> void: _set_notice(HudUtil.weapon_notice(weapon)))
 	for enemy in _area.enemies():
 		enemy.get_node("Combat").feedback.connect(_play_feedback)
 	_area.enemy_defeated.connect(func(_enemy: Node) -> void:
@@ -44,6 +47,7 @@ func _process(delta: float) -> void:
 	Music.set_intensity(2 if engaged else (0 if outcome == &"defeat" else 1))
 	_vitality.value = _hero.health
 	_stamina.value = _hero.stamina
+	_focus.value = _hero.focus
 	_notice_time = maxf(0.0, _notice_time - delta)
 	_notice.visible = _notice_time > 0.0
 	var enemy := _visible_opponent()
@@ -104,6 +108,10 @@ func _play_feedback(cue: StringName, at: Vector3, strength: float = 0.5) -> void
 		&"parry": _set_notice("Parried  ·  Counter now")
 		&"guard_break": _set_notice("Guard broken")
 		&"tired": _set_notice("Out of stamina")
+		&"shockwave": RetroFX.shockwave(at, 3.0)
+		&"nova": RetroFX.shockwave(at, 2.8, Color(0.66, 0.58, 1.0))
+		&"critical": _set_notice("Critical")
+		&"no_focus": _set_notice("Not enough focus")
 
 
 func _set_notice(message: String) -> void:

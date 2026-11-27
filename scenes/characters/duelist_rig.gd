@@ -34,7 +34,14 @@ const DEFAULT_WEAPONS: Array[SoulsWeapon] = [
 	preload("res://scenes/combat/weapons/longsword.tres"),
 ]
 ## Clips in which the blade cuts. The trail draws over the strike part of their timeline.
-const STRIKE_CLIPS: Array[StringName] = [&"light", &"light_b", &"heavy", &"enemy_slash", &"enemy_thrust"]
+const STRIKE_CLIPS: Array[StringName] = [&"light", &"light_b", &"light_c", &"heavy", &"enemy_slash",
+		&"enemy_thrust", &"stab", &"dash_slash", &"slam", &"zombie_scratch", &"melee_hook", &"punch_cross",
+		&"spin_slash", &"leap_slam"]
+## Attack clips that borrow another clip's blade path.
+const SWING_ALIAS := {
+	&"enemy_slash": &"light", &"stab": &"enemy_thrust", &"light_c": &"enemy_thrust", &"cast": &"enemy_thrust",
+	&"dash_slash": &"light", &"slam": &"heavy", &"nova": &"heavy", &"spin_slash": &"light", &"leap_slam": &"heavy",
+}
 ## Blade paths in skeleton space (metres, facing -Z, right hand on +X). Each key is
 ## [phase, sword-hand position, blade direction, elbow pole]. Phases follow the combat clock:
 ## windup ends at 0.44 and the cutting interval runs to 0.66, so the edge crosses the space
@@ -361,7 +368,45 @@ func set_weapon(next: SoulsWeapon) -> void:
 	_weapon_root.position = Vector3(0, -.035, 0)
 	var length := weapon.blade_length
 	var guard := 0.0
+	var along_fingers := false
 	match weapon.form:
+		SoulsWeapon.Form.CLAW:
+			# Claws, fists and bone growths: the "edge" runs along the fingers (hand -Y).
+			along_fingers = true
+		SoulsWeapon.Form.DAGGER:
+			guard = .06
+			_box("","Grip",Vector3(.03,.034,weapon.grip_length),leather,Vector3(0,0,weapon.grip_length*.5-.06),Vector3.ZERO,_weapon_root)
+			_box("","Knuckle",Vector3(.11,.03,.03),bone,Vector3(0,0,-guard+.01),Vector3.ZERO,_weapon_root)
+			_loft("","Shiv",bone,[Vector4(0,.026,.012,0),Vector4(length*.6,.02,.009,0),Vector4(length,.001,.001,0)],
+					4,Vector3(0,0,-guard),Vector3(-90,0,0),_weapon_root)
+		SoulsWeapon.Form.KATANA:
+			guard = .12
+			_box("","Wrap",Vector3(.032,.036,weapon.grip_length),leather,Vector3(0,0,-.11+weapon.grip_length*.5),Vector3.ZERO,_weapon_root)
+			_loft("","Tsuba",trim,[Vector4(0,.055,.05,0),Vector4(.012,.055,.05,0)],8,Vector3(0,0,-guard+.01),Vector3(-90,0,0),_weapon_root)
+			# A shallow curve: each section steps toward the spine as it nears the point.
+			_loft("","Blade",blade,[Vector4(0,.026,.012,0),Vector4(length*.35,.025,.011,.012),
+					Vector4(length*.7,.023,.01,.03),Vector4(length*.92,.018,.008,.048),Vector4(length,.001,.001,.056)],
+					4,Vector3(0,0,-guard),Vector3(-90,0,0),_weapon_root)
+		SoulsWeapon.Form.HAMMER:
+			var shaft := length - .12
+			_loft("","Haft",leather,[Vector4(-weapon.grip_length,.026,.026,0),Vector4(shaft,.024,.024,0)],8,
+					Vector3.ZERO,Vector3(-90,0,0),_weapon_root)
+			_box("","Head",Vector3(.34,.2,.2),iron,Vector3(0,0,-shaft-.04),Vector3.ZERO,_weapon_root)
+			_box("","Band",Vector3(.36,.06,.22),trim,Vector3(0,0,-shaft-.04),Vector3.ZERO,_weapon_root)
+			_loft("","Spike",iron,[Vector4(0,.05,.05,0),Vector4(.16,.001,.001,0)],4,
+					Vector3(0,0,-shaft-.1),Vector3(-90,0,0),_weapon_root)
+		SoulsWeapon.Form.STAFF:
+			var shaft := length - .1
+			_loft("","Staff",leather,[Vector4(-weapon.grip_length,.022,.022,0),Vector4(shaft,.02,.02,0)],6,
+					Vector3.ZERO,Vector3(-90,0,0),_weapon_root)
+			var ember := StandardMaterial3D.new()
+			ember.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			ember.albedo_color = Color(0.68, 0.6, 1.0)
+			_loft("","Focus",ember,[Vector4(0,.001,.001,0),Vector4(.06,.06,.06,0),Vector4(.16,.001,.001,0)],4,
+					Vector3(0,0,-shaft),Vector3(-90,0,0),_weapon_root)
+			for k in 3:
+				_box("","Prong%d" % k,Vector3(.016,.016,.14),trim,Vector3(cos(k*TAU/3)*.05,sin(k*TAU/3)*.05,-shaft+.02),
+						Vector3.ZERO,_weapon_root)
 		SoulsWeapon.Form.SPEAR, SoulsWeapon.Form.JAVELIN:
 			var shaft := length - .29
 			_loft("","AshShaft",leather,[Vector4(-weapon.grip_length,.024,.024,0),
@@ -397,17 +442,22 @@ func set_weapon(next: SoulsWeapon) -> void:
 	_blade_tip.name = "BladeTip"
 	_weapon_root.add_child(_blade_base)
 	_weapon_root.add_child(_blade_tip)
-	_blade_base.position = Vector3(0, 0, -guard - length * weapon.dead_length)
-	_blade_tip.position = Vector3(0, 0, -guard - length)
+	if along_fingers:
+		_weapon_root.position = Vector3.ZERO
+		_blade_base.position = Vector3(0, -.03 - length * weapon.dead_length, 0)
+		_blade_tip.position = Vector3(0, -.03 - length, 0)
+	else:
+		_blade_base.position = Vector3(0, 0, -guard - length * weapon.dead_length)
+		_blade_tip.position = Vector3(0, 0, -guard - length)
 	_trail.color = weapon.trail_color
 	_trail.clear()
 
 ## Sword arm follows the clip's blade path; a two-handed weapon also pulls the off hand onto
 ## the grip. Weight ramps at both ends of the clip so the IK pose blends with the authored body.
 func _drive_arms(clip: StringName, phase: float) -> void:
-	if weapon == null or weapon.form == SoulsWeapon.Form.JAVELIN:
+	if weapon == null or weapon.form in [SoulsWeapon.Form.JAVELIN, SoulsWeapon.Form.CLAW]:
 		return
-	var path: Array = SWINGS.get(&"light" if clip == &"enemy_slash" else clip, [])
+	var path: Array = SWINGS.get(SWING_ALIAS.get(clip, clip), [])
 	var key: Array = []
 	var weight := 0.0
 	if not path.is_empty():

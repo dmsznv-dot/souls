@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="SoulsWeapon" format=3]
+
+[ext_resource type="Script" path="res://scenes/combat/weapons/weapon_data.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/duel/combat/attack_data.gd" id="s"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/attacks/hammer_light.tres" id="a0"]
+[ext_resource type="Resource" path="res://scenes/combat/weapons/attacks/hammer_slam.tres" id="a1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "Bellbreaker"
+form = 7
+light_chain = Array[ExtResource("s")]([ExtResource("a0")])
+heavy = ExtResource("a1")
+blade_length = 1.05
+grip_length = 0.4
+blade_half_width = 0.12
+dead_length = 0.72
+mass = 11.0
+two_handed = true
+trail_color = Color(0.8, 0.75, 0.7, 0.5)
+hint = "Crushes guards · heavy slams a shockwave"

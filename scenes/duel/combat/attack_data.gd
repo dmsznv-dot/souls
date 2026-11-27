@@ -1,6 +1,8 @@
 class_name DuelAttack
 extends Resource
 
+enum DamageType { SLASH, PIERCE, IMPACT, MAGIC }
+
 @export var clip: StringName
 @export_range(0.01, 2.0, 0.01, "suffix:s") var windup: float = 0.16
 @export_range(0.01, 1.0, 0.01, "suffix:s") var active: float = 0.10
@@ -22,6 +24,29 @@ extends Resource
 @export_range(0.0, 1.0, 0.01) var roll_cancel_point: float = 0.55
 ## Light blows landing during windup and strike do not interrupt this attack.
 @export var hyper_armor: bool = false
+@export var damage_type: DamageType = DamageType.SLASH
+## Focus (magic meter) spent to start the attack.
+@export_range(0.0, 100.0, 1.0) var focus_cost: float = 0.0
+
+@export_group("Specials")
+## Area blow when the strike lands: everything within this radius is hit (0 = none).
+@export_range(0.0, 8.0, 0.1, "suffix:m") var shockwave_radius: float = 0.0
+## Centre of the area blow ahead of the body; 0 centres it on the attacker (a nova).
+@export_range(0.0, 4.0, 0.1, "suffix:m") var shockwave_offset: float = 1.3
+## Extra windup the attack can be held for while the button stays down.
+@export_range(0.0, 2.0, 0.05, "suffix:s") var charge_time: float = 0.0
+## Damage and posture bonus at full charge (0.6 = +60 %).
+@export_range(0.0, 2.0, 0.05) var charge_bonus: float = 0.6
+## Damage multiplier for hits landing on a foe's back.
+@export_range(1.0, 4.0, 0.1) var backstab_multiplier: float = 1.0
+## Pose held at the top of the windup before the strike falls: a feint that baits early rolls.
+@export_range(0.0, 2.0, 0.05, "suffix:s") var delay: float = 0.0
+## The body turns a full circle during the active window.
+@export var spin: bool = false
+## Horizontal distance closed in a leap during the end of the windup.
+@export_range(0.0, 12.0, 0.1, "suffix:m") var leap: float = 0.0
+@export_range(1, 7) var projectile_count: int = 1
+@export_range(0.0, 90.0, 1.0, "degrees") var projectile_spread: float = 0.0
 
 
 func hit_stop() -> float:

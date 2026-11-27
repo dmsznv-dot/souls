@@ -19,3 +19,4 @@ dead_length = 0.1
 mass = 9.0
 two_handed = true
 trail_color = Color(1, 0.62, 0.34, 0.6)
+hint = "Slow, unflinching · hold heavy to charge"

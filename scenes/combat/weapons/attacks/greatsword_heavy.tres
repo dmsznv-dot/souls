@@ -5,16 +5,19 @@
 [resource]
 script = ExtResource("1")
 clip = &"heavy"
-windup = 0.62
+windup = 0.72
 active = 0.17
-recovery = 0.72
-damage = 52.0
+recovery = 0.78
+damage = 58.0
 stamina_cost = 38.0
-block_cost = 55.0
-posture_damage = 75.0
+block_cost = 60.0
+posture_damage = 80.0
 reach = 2.8
 arc = 96.0
 lunge_speed = 3.0
 impact = 1.0
 chain_point = 0.5
-roll_cancel_point = 0.72
+roll_cancel_point = 0.75
+hyper_armor = true
+charge_time = 0.6
+charge_bonus = 0.6

@@ -3,7 +3,7 @@ extends Resource
 ## A held weapon: its geometry decides where it strikes, its mass decides how it feels.
 ## Attack timing, damage and stamina live in the DuelAttack resources it references.
 
-enum Form { SHORTSWORD, LONGSWORD, GREATSWORD, SPEAR, JAVELIN }
+enum Form { SHORTSWORD, LONGSWORD, GREATSWORD, SPEAR, JAVELIN, DAGGER, KATANA, HAMMER, STAFF, CLAW }
 
 @export var display_name: String = "Longsword"
 @export var form: Form = Form.LONGSWORD
@@ -18,6 +18,10 @@ enum Form { SHORTSWORD, LONGSWORD, GREATSWORD, SPEAR, JAVELIN }
 @export var light_chain: Array[DuelAttack] = []
 @export var heavy: DuelAttack
 @export var trail_color: Color = Color(0.92, 0.88, 0.8, 0.55)
+## Light attack used when the chain's first attack cannot be paid for (a staff without focus).
+@export var fallback_light: DuelAttack
+## One line shown when the weapon is drawn: what makes it different.
+@export_multiline var hint: String = ""
 
 
 ## Walking speed multiplier while this weapon is held.
