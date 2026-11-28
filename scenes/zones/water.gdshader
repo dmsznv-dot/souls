@@ -6,6 +6,7 @@ render_mode diffuse_toon, specular_toon;
 uniform vec3 deep_color : source_color = vec3(0.05, 0.08, 0.12);
 uniform vec3 shallow_color : source_color = vec3(0.12, 0.16, 0.2);
 uniform float ripple_scale = 0.35;
+uniform vec3 sheen_color : source_color = vec3(0.045, 0.06, 0.085);
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -32,7 +33,10 @@ void fragment() {
 	float dx = noise(p + vec2(0.05, 0.0) + vec2(TIME * 0.12, TIME * 0.05)) - a;
 	float dz = noise(p + vec2(0.0, 0.05) + vec2(TIME * 0.12, TIME * 0.05)) - a;
 	NORMAL = normalize(NORMAL + (VIEW_MATRIX * vec4(dx * 6.0, 0.0, dz * 6.0, 0.0)).xyz);
-	ALBEDO = mix(deep_color, shallow_color, h);
+	// A cold sheen at grazing angles so the surface reads against the banks.
+	float facing = clamp(dot(normalize(NORMAL), VIEW), 0.0, 1.0);
+	float sheen = pow(1.0 - facing, 5.0);
+	ALBEDO = mix(deep_color, shallow_color, h) + sheen_color * sheen;
 	ROUGHNESS = 0.08;
 	SPECULAR = 0.7;
 }

@@ -43,6 +43,8 @@ var _visual: Node3D
 var _enemies: Node3D
 var _navigation: NavigationRegion3D
 var _loops: Array[Node] = []
+## Particles that drift only while the zone is active (mist, fireflies, dust).
+var _ambient: Array[CPUParticles3D] = []
 var _materials := {}
 
 
@@ -64,6 +66,10 @@ func prepare(hero: CharacterBody3D, streamed: bool) -> void:
 	_layout()
 	if streamed:
 		await get_tree().process_frame
+	_detail_nodes()
+	await _build_detail(streamed)
+	if streamed:
+		await get_tree().process_frame
 		await get_tree().process_frame
 	_navigation = NavigationRegion3D.new()
 	_navigation.name = "Navigation"
@@ -83,11 +89,51 @@ func _layout() -> void:
 	pass
 
 
+## Lights, solid pieces and particles that go with the detail pass (main thread).
+func _detail_nodes() -> void:
+	pass
+
+
+## Detail geometry as [[ZoneDetail builder, region name], ...]. Pure geometry with no scene
+## access: it runs on a worker thread when the zone is streamed.
+func _detail_regions() -> Array:
+	return []
+
+
+func _bake_regions() -> Array:
+	var regions := _detail_regions()
+	for region: Array in regions:
+		region[0].bake()
+	return regions
+
+
+## Builds the detail off the main thread when streamed (tens of milliseconds of geometry), then
+## hands the finished meshes to the scene one region per frame.
+func _build_detail(streamed: bool) -> void:
+	var regions: Array = []
+	if streamed:
+		var task := WorkerThreadPool.add_task(func() -> void: regions.append_array(_bake_regions()))
+		while not WorkerThreadPool.is_task_completed(task):
+			await get_tree().process_frame
+		WorkerThreadPool.wait_for_task_completion(task)
+	else:
+		regions = _bake_regions()
+	for region: Array in regions:
+		if not is_inside_tree():
+			return
+		region[0].attach(_visual, region[1])
+		if streamed:
+			await get_tree().process_frame
+
+
 func activate() -> void:
 	active = true
 	for loop in _loops:
 		if loop is AudioStreamPlayer3D and not loop.playing:
 			loop.play()
+	for air in _ambient:
+		air.emitting = true
+		air.visible = true
 	for foe in enemies():
 		foe.ai_enabled = true
 
@@ -97,6 +143,9 @@ func deactivate() -> void:
 	for loop in _loops:
 		if loop is AudioStreamPlayer3D:
 			loop.stop()
+	for air in _ambient:
+		air.emitting = false
+		air.visible = false
 	for foe in enemies():
 		foe.ai_enabled = false
 
@@ -286,6 +335,12 @@ func loop_sound(path: String, at: Vector3, volume_db: float, unit_size: float = 
 	voice.position = at
 	_loops.append(voice)
 	return voice
+
+
+func ambient(air: CPUParticles3D) -> CPUParticles3D:
+	add_child(air)
+	_ambient.append(air)
+	return air
 
 
 func dress(at: Vector3, entries: Array, seed: int) -> void:

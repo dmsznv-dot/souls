@@ -13,6 +13,10 @@ const FLOOR_Y := -4.0
 const HALL_Y := -1.0
 const BELL := Vector3(0.0, 3.2, -44.0)
 const EXIT := Vector3(0.0, 2.0, -58.0)
+const Detail = preload("res://scenes/zones/zone_detail.gd")
+## Pillars in the chamber (holding up the roots) and sarcophagi in the bell hall: [at, yaw].
+const PILLARS := [Vector3(-4.0, FLOOR_Y, -22.5), Vector3(4.0, FLOOR_Y, -22.5)]
+const SARCOPHAGI := [[Vector3(-6.4, HALL_Y, -42.3), 0.0], [Vector3(-6.4, HALL_Y, -45.2), 0.0], [Vector3(6.4, HALL_Y, -46.6), 0.0]]
 
 var _bell: Node3D
 var _bell_voice: AudioStreamPlayer3D
@@ -130,6 +134,168 @@ func _layout() -> void:
 	breakable(&"barrel", "chamber/barrel_0", Vector3(-7.2, FLOOR_Y, -19.4), 0.0)
 	loop_sound("res://assets/audio/ambience/drips.ogg", Vector3(0, FLOOR_Y + 4.0, -25.0), -5.0, 10.0)
 	loop_sound("res://assets/audio/ambience/rain.ogg", Vector3(0, 2.0, -1.0), -8.0, 6.0)
+	for at: Vector3 in PILLARS:
+		box(at + Vector3(0, 3.5, 0), Vector3(0.9, 7.0, 0.9), null)
+	for spec: Array in SARCOPHAGI:
+		box(spec[0] + Vector3(0, 0.45, 0), Vector3(0.95, 0.9, 2.15), null, spec[1])
+
+
+# ---------------------------------------------------------------- detail
+
+## Rock that stops reading as boxes, roots through it, the crypt's ribs and the hall's masonry,
+## pillars, sarcophagi, candles, chains, the bell's beam and the shaft of moonlight. Built in
+## regions (gorge and tunnel, chamber and niche, hall and exit) so no merged mesh spans too
+## many lights. Pure geometry: runs on a worker thread when the zone is streamed.
+func _detail_regions() -> Array:
+	var regions := []
+	# Close to the walls' own stone, so the skin reads as the same rock broken up.
+	var rock := Color(0.27, 0.28, 0.25)
+	var dressed := Color(0.25, 0.24, 0.23)
+	var root_color := Color(0.2, 0.15, 0.11)
+	var iron := Color(0.1, 0.1, 0.11)
+	var violet := Color(0.45, 0.34, 0.9)
+
+	# Gorge and tunnel.
+	var d: Detail = Detail.new(401)
+	for side: float in [-1.0, 1.0]:
+		d.rock_skin(Vector3(side * 2.7, 2.5, -3.0), Vector3(-side, 0, 0), 6.0, 6.0, 1.4, rock)
+		for k in 4:
+			d.blob(d.opaque, Vector3(side * d.rng.randf_range(3.0, 3.6), 5.4, -0.8 - k * 1.5), d.rng.randf_range(0.5, 0.8), Vector3(1.2, 0.8, 1.1), rock.darkened(0.1))
+		# Tendrils hanging from the arching roots.
+		for k in 3:
+			var top := Vector3(side * d.rng.randf_range(0.5, 2.2), 4.1 - k * 0.2, -1.2 - k * 2.0)
+			d.root(top, top + Vector3(d.rng.randf_range(-0.3, 0.3), -d.rng.randf_range(1.0, 2.2), d.rng.randf_range(-0.3, 0.3)), 0.05, root_color)
+		# The crypt arch: capitals, a keystone, a weathered course.
+		d.block(d.opaque, Vector3(side * 1.9, 3.05, -6.2), Vector3(0.8, 0.2, 0.8), dressed)
+		d.block(d.opaque, Vector3(side * 1.9, 0.1, -6.2), Vector3(0.8, 0.2, 0.8), dressed)
+	d.block(d.opaque, Vector3(0, 3.45, -5.82), Vector3(0.6, 0.75, 0.1), dressed.lightened(0.05))
+	d.block(d.glow, Vector3(0, 3.45, -5.76), Vector3(0.18, 0.3, 0.02), violet.darkened(0.3))
+	for k in 6:
+		# Ribs down the tunnel: posts and a beam under the tilted ceiling.
+		var t := 0.08 + k * 0.165
+		var floor := Vector3(0, -4.0 * t, -6.0 - 12.0 * t)
+		for side: float in [-1.0, 1.0]:
+			d.block(d.opaque, floor + Vector3(side * 1.7, 1.4, 0), Vector3(0.22, 2.8, 0.32), dressed.darkened(0.1))
+		d.block(d.opaque, floor + Vector3(0, 2.86, 0), Vector3(3.7, 0.24, 0.32), dressed.darkened(0.1))
+		for side: float in [-1.0, 1.0]:
+			d.blob(d.opaque, floor + Vector3(side * 1.45, 0.05, d.rng.randf_range(-0.6, 0.6)), d.rng.randf_range(0.12, 0.22), Vector3(1.2, 0.6, 1.0), rock)
+	regions.append([d, "DetailGorge"])
+
+	# Chamber and niche.
+	d = Detail.new(402)
+	var floor_y := FLOOR_Y + 3.5
+	d.rock_skin(Vector3(8.3, floor_y, -25.5), Vector3(-1, 0, 0), 15.0, 7.0, 1.5, rock)
+	for piece: Vector2 in [Vector2(-18.0, -19.8), Vector2(-21.8, -28.2), Vector2(-30.2, -33.0)]:
+		d.rock_skin(Vector3(-8.3, floor_y, (piece.x + piece.y) * 0.5), Vector3(1, 0, 0), absf(piece.x - piece.y), 7.0, 1.5, rock)
+	for piece: Vector2 in [Vector2(-8.5, -2.1), Vector2(2.1, 8.5)]:
+		d.rock_skin(Vector3((piece.x + piece.y) * 0.5, floor_y, -18.2), Vector3(0, 0, -1), piece.y - piece.x, 7.0, 1.5, rock)
+	for piece: Vector2 in [Vector2(-8.5, -2.5), Vector2(2.5, 5.4)]:
+		d.rock_skin(Vector3((piece.x + piece.y) * 0.5, floor_y, -32.8), Vector3(0, 0, 1), piece.y - piece.x, 7.0, 1.5, rock)
+	# The ceiling: drips of stone and roots breaking through and down the walls.
+	for k in 22:
+		var top := Vector3(d.rng.randf_range(-7.8, 7.8), FLOOR_Y + 7.0, d.rng.randf_range(-18.8, -32.2))
+		d.rod(d.opaque, top + Vector3(0, 0.1, 0), top - Vector3(0, d.rng.randf_range(0.3, 1.0), 0), d.rng.randf_range(0.12, 0.25), 0.01, rock.darkened(0.1), 5)
+	for k in 7:
+		var x := -7.5 + k * 2.5
+		var from := Vector3(x, FLOOR_Y + 6.95, -18.6)
+		var across := Vector3(x + d.rng.randf_range(-1.5, 1.5), FLOOR_Y + 6.8, -25.5 + d.rng.randf_range(-2.0, 2.0))
+		d.root(from, across, 0.16, root_color)
+		if k % 2 == 0:
+			var wall_x := 8.2 if x > 0.0 else -8.2
+			d.root(across, Vector3(wall_x, FLOOR_Y + d.rng.randf_range(1.5, 3.5), across.z + d.rng.randf_range(-1.0, 1.0)), 0.12, root_color)
+	for at: Vector3 in PILLARS:
+		d.pillar(at, 7.0, 0.38, dressed, root_color)
+		d.blob(d.opaque, at + Vector3(0.4, 0.05, 0.4), 0.2, Vector3(1.3, 0.5, 1.0), rock)
+	# Rubble along the walls and a broken flag floor round the fire; the middle stays clear.
+	for k in 26:
+		var along := d.rng.randf()
+		var at: Vector3
+		match k % 4:
+			0: at = Vector3(7.9, FLOOR_Y, lerpf(-19.0, -32.0, along))
+			1: at = Vector3(-7.9, FLOOR_Y, lerpf(-22.0, -28.0, along))
+			2: at = Vector3(lerpf(-7.8, -2.6, along), FLOOR_Y, -32.4)
+			_: at = Vector3(lerpf(2.6, 5.0, along), FLOOR_Y, -18.6)
+		d.blob(d.opaque, at, d.rng.randf_range(0.12, 0.3), Vector3(1.2, 0.6, 1.0), rock.lightened(0.04))
+	d.flagstones(Vector3(-4.0, FLOOR_Y, -27.0), Vector2(2.6, 2.4), Vector2(0.9, 0.7), dressed.darkened(0.15), 0.25)
+	for k in 5:
+		# Cracks: thin dark seams across the floor.
+		var at := Vector3(d.rng.randf_range(-6.0, 6.0), FLOOR_Y + 0.005, d.rng.randf_range(-20.0, -31.0))
+		d.block(d.opaque, at, Vector3(d.rng.randf_range(0.8, 1.8), 0.01, 0.04), Color(0.04, 0.04, 0.05), Basis(Vector3.UP, d.rng.randf() * PI))
+	# Chains from the ceiling.
+	for spec: Array in [[Vector3(2.2, FLOOR_Y + 7.0, -25.5), 3.2], [Vector3(-1.6, FLOOR_Y + 7.0, -29.0), 2.4], [Vector3(-6.0, FLOOR_Y + 7.0, -23.0), 3.8]]:
+		d.iron_chain(spec[0], spec[1], iron)
+	# The ritual arch: runes down both pillars, candles at their feet.
+	for side: float in [-1.0, 1.0]:
+		for k in 4:
+			d.block(d.glow, Vector3(side * 2.3, FLOOR_Y + 0.8 + k * 0.6, -32.33), Vector3(0.08 + 0.06 * (k % 2), 0.26, 0.02), violet.darkened(0.2 + 0.1 * (k % 3)))
+		d.candles(Vector3(side * 1.75, FLOOR_Y, -32.1), 5)
+		# Torch sconces on the front wall either side of the crypt mouth.
+		var sconce := Vector3(side * 5.0, FLOOR_Y + 2.3, -18.25)
+		d.block(d.opaque, sconce + Vector3(0, 0, -0.08), Vector3(0.14, 0.4, 0.12), iron)
+		d.rod(d.opaque, sconce + Vector3(0, 0.1, -0.1), sconce + Vector3(0, 0.45, -0.32), 0.04, 0.05, Color(0.22, 0.16, 0.1), 5)
+	# The niche: roots in from the ceiling, candles by the bones.
+	d.root(Vector3(-12.4, FLOOR_Y + 2.5, -21.0), Vector3(-11.6, FLOOR_Y + 0.2, -23.5), 0.1, root_color)
+	d.root(Vector3(-9.6, FLOOR_Y + 2.5, -28.5), Vector3(-12.3, FLOOR_Y + 1.0, -27.0), 0.08, root_color)
+	d.candles(Vector3(-12.2, FLOOR_Y, -24.0), 4)
+	regions.append([d, "DetailChamber"])
+
+	# Bell hall and exit.
+	d = Detail.new(403)
+	var hall_mid := HALL_Y + 3.5
+	for side: float in [-1.0, 1.0]:
+		d.masonry(Vector3(side * 7.7, hall_mid, -45.0), Vector3(-side, 0, 0), 10.8, 7.0, dressed)
+	d.masonry(Vector3(-5.1, hall_mid, -39.6), Vector3(0, 0, -1), 5.8, 7.0, dressed)
+	d.masonry(Vector3(3.85, hall_mid, -39.6), Vector3(0, 0, -1), 3.3, 7.0, dressed)
+	d.masonry(Vector3(-4.9, hall_mid, -50.5), Vector3(0, 0, 1), 6.0, 7.0, dressed)
+	d.masonry(Vector3(4.9, hall_mid, -50.5), Vector3(0, 0, 1), 6.0, 7.0, dressed)
+	d.flagstones(Vector3(0, HALL_Y, -45.05), Vector2(7.6, 5.4), Vector2(1.1, 0.8), dressed.darkened(0.2), 0.08)
+	for spec: Array in SARCOPHAGI:
+		d.sarcophagus(spec[0], spec[1], dressed.darkened(0.05))
+		d.candles(spec[0] + Basis(Vector3.UP, spec[1]) * Vector3(0.0, 0.92, 0.6), 3)
+	# The bell's beam across the shaft, its ends under the roof, iron straps and roots round it.
+	var beam_y := BELL.y + 3.65
+	d.block(d.opaque, Vector3(0, beam_y, BELL.z), Vector3(6.4, 0.36, 0.42), Color(0.2, 0.15, 0.11))
+	for x: float in [-0.35, 0.35]:
+		d.block(d.opaque, Vector3(x, beam_y, BELL.z), Vector3(0.06, 0.42, 0.48), iron)
+	d.root(Vector3(-2.6, beam_y + 0.3, BELL.z - 1.5), Vector3(1.2, beam_y + 0.1, BELL.z + 0.3), 0.12, root_color)
+	d.root(Vector3(2.4, beam_y + 0.5, BELL.z + 2.0), Vector3(0.4, beam_y - 0.4, BELL.z - 0.2), 0.1, root_color)
+	for k in 5:
+		var top := Vector3(d.rng.randf_range(-2.0, 2.0), beam_y + 0.3, BELL.z + d.rng.randf_range(-2.2, 2.2))
+		d.root(top, top + Vector3(d.rng.randf_range(-0.4, 0.4), -d.rng.randf_range(1.2, 2.6), d.rng.randf_range(-0.4, 0.4)), 0.05, root_color)
+	# Shards of an older bell fallen by the wall.
+	for k in 6:
+		var at := Vector3(4.5 + d.rng.randf_range(-0.8, 0.8), HALL_Y + 0.06, -49.3 + d.rng.randf_range(-0.6, 0.6))
+		d.block(d.opaque, at, Vector3(d.rng.randf_range(0.2, 0.5), 0.06, d.rng.randf_range(0.15, 0.35)), Color(0.3, 0.24, 0.14),
+				Basis.from_euler(Vector3(d.rng.randf_range(-0.3, 0.3), d.rng.randf() * TAU, d.rng.randf_range(-0.3, 0.3))))
+	d.frustum(d.opaque, Vector3(5.2, HALL_Y, -48.6), 0.7, 0.4, 0.7, 10, Color(0.26, 0.2, 0.12), Color(0.32, 0.25, 0.15), Vector3(0.25, -0.1, 0))
+	# Sconces on the back wall either side of the exit stairs.
+	for side: float in [-1.0, 1.0]:
+		var sconce := Vector3(side * 3.4, HALL_Y + 2.3, -50.45)
+		d.block(d.opaque, sconce + Vector3(0, 0, 0.08), Vector3(0.14, 0.4, 0.12), iron)
+		d.rod(d.opaque, sconce + Vector3(0, 0.1, 0.1), sconce + Vector3(0, 0.45, 0.32), 0.04, 0.05, Color(0.22, 0.16, 0.1), 5)
+	# The exit: a lintel over the door posts, worn threshold.
+	d.block(d.opaque, Vector3(0, EXIT.y + 3.35, -56.4), Vector3(5.2, 0.4, 0.6), dressed)
+	d.block(d.opaque, Vector3(0, EXIT.y + 3.62, -56.4), Vector3(1.0, 0.2, 0.62), dressed.lightened(0.05))
+	d.block(d.glow, Vector3(0, EXIT.y + 3.35, -56.08), Vector3(0.5, 0.06, 0.02), violet.darkened(0.35))
+	d.flagstones(Vector3(0, EXIT.y, -59.0), Vector2(2.4, 2.7), Vector2(0.9, 0.7), dressed.darkened(0.1), 0.15)
+	regions.append([d, "DetailHall"])
+	return regions
+
+
+## The sconces' fire, the shaft of moonlight and the dust (main thread, cheap).
+func _detail_nodes() -> void:
+	for flame: Vector3 in [Vector3(-5.0, FLOOR_Y + 2.82, -18.6), Vector3(5.0, FLOOR_Y + 2.82, -18.6),
+			Vector3(-3.4, HALL_Y + 2.82, -50.13), Vector3(3.4, HALL_Y + 2.82, -50.13)]:
+		var inward := -0.1 if flame.z > -30.0 else 0.1
+		lamp(flame + Vector3(0, 0.15, inward), 4.5 if flame.z > -30.0 else 4.0, 6.5, Color(1.0, 0.55, 0.22), &"torch", "Sconce")
+		var fire := Props.flames(0.55, 12, 0.07)
+		add_child(fire)
+		fire.position = flame
+	# Moonlight down the shaft and dust turning in it and in the chamber.
+	var shaft := Detail.light_shaft(Vector3(0, HALL_Y + 8.6, -45.0), Vector3(0.3, HALL_Y + 0.05, -44.6), 1.7, 2.6, Color(0.5, 0.6, 0.85, 0.14))
+	_visual.add_child(shaft)
+	ambient(Detail.dust(Vector3(0, HALL_Y + 3.5, -45.0), Vector3(1.8, 3.4, 1.8), 46))
+	ambient(Detail.dust(Vector3(0, FLOOR_Y + 3.0, -25.5), Vector3(7.0, 2.5, 6.0), 30))
 
 
 ## The niche: a passage behind the west wall from the grate (z -21) round to an open mouth

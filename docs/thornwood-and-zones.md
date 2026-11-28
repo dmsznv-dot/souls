@@ -94,6 +94,34 @@ one the player is in (weather, sound loops, foes). Each also runs alone:
 | Respawn | reaching the gorge mouth makes it the place to rise (until the next rest at the bonfire) |
 | Weather and sound | preset `belfry`: rain only at the mouth, dripping inside |
 
+### Detail pass
+
+`scenes/zones/zone_detail.gd` turns the grey boxes into places without touching collision or
+navigation (both still come from the zone's simple blocks; the few new solid pieces are listed
+below). Everything is low-poly geometry with vertex colours gathered into three meshes per
+region: opaque, double-sided (reeds, ropes, nets) and glowing (candle flames, runes, lantern
+glass). Each zone commits one builder per region so no merged mesh spans more lights than the
+compatibility renderer gives one object (8).
+
+| Zone | Region | Detail |
+| --- | --- | --- |
+| Crossing | shore | a faceted mud bank mottled with moss and puddles, its skirt sloping under the water; stones and roots along the slope; reeds at the water's edge, lily pads, a floating log |
+| Crossing | islet | the walk as separate planks with gaps over two stringers, round piles, a rope rail on tall piles; the warden's hut in vertical boards with a gable roof, porch, a door swung open, a rain barrel (solid), a net drying on poles; the old mooring line with sagging ropes, the broken old walk, a half-sunk rowboat tied to a stake; reeds ringing the islet and lining both edges of the ford, stones in the ford |
+| Crossing | far bank | moss on the step noses, coping on the side walls (a few missing), two stone posts with lanterns at the foot of the steps (solid, lit), a worn waymark stele with a violet mark at the top (solid) |
+| Crossing | air | mist drifting low over the water, fireflies over the ford, two dead trees leaning over the water; the water has a cold sheen at grazing angles |
+| Belfry | gorge and tunnel | rock walls broken into boulders, hanging root tendrils, the crypt arch's capitals and keystone with a faint violet mark, stone ribs every two metres down the tunnel |
+| Belfry | chamber and niche | rough rock skin on every wall, stone drips and roots across the ceiling and down the walls, two root-wrapped pillars (solid) holding the roof, a broken flag floor round the fire, cracks, rubble along the walls, three iron chains, runes and candles on the ritual arch, two torch sconces at the crypt mouth (lit), roots and candles in the niche, dust in the air |
+| Belfry | bell hall and exit | masonry courses on the walls, a flag floor, three sarcophagi with candles (solid, along the walls, clear of the gallery's arrival), the bell's beam with iron straps and roots, shards of an older bell, two sconces by the exit stairs (lit), a carved lintel over the exit; a faint shaft of moonlight down to the floor with dust turning in it |
+
+Mist, fireflies and dust drift only while their zone is active.
+
+Cost: about 12 000 detail triangles in the crossing and 46 000 in the belfry. Building them
+takes 17 and 57 ms of GDScript, so a streamed zone builds its regions on a worker thread
+(`_detail_regions()` is pure geometry, `ZoneDetail.bake()` touches no scene or server) and
+hands the finished meshes to the scene one region per frame (1-5 ms each). Lights, solid pieces
+and particles that belong to the detail come from `_detail_nodes()` on the main thread, a frame
+after the layout.
+
 ## Checks
 
 `tests/zones.gd` (41 checks): fire liveliness, phase and drift; wind reaching and leaving the
@@ -102,8 +130,10 @@ gone, reset, a wall blocks the blow, the grate stays open); composition groups, 
 nothing near landings or the bonfire; both zones walkable on their navigation from entry to
 exit (the crossing also through the ford, the belfry also by the gallery); drowning and rising;
 the bell; walking on from the clearing into both zones and the belfry checkpoint; the portal's
-readiness, lock and unlock. Streaming the forest with both zones keeps frames at or under about
-17 ms apart from the first load of a foe scene (already loaded in the expedition by the ruins).
+readiness, lock and unlock. Measured streaming the forest with both zones from the ruins
+(headless): most frames stay under about 15 ms, but one frame of about 50 ms right as the forest
+finishes and one of about 25 ms shortly before remain. They are there with or without the detail
+pass and are not tracked down yet.
 
 Not done yet: F4 build/emitter counters, a debug view of anchors and no-prop zones, the new
 arch's effect (it stays a landmark until it has a destination), a dedicated music cue per zone
