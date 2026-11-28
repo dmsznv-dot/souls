@@ -56,7 +56,8 @@ func request(foe: Node, cost: int = 1, urgent: bool = false) -> bool:
 	var limit := BUDGET + (1 if urgent or waited > STARVED_WAIT else 0)
 	if waited > STARVED_WAIT:
 		cost = mini(cost, 1)
-	if used + cost > limit or (_since_attack < STAGGER and not urgent and waited < STARVED_WAIT):
+	# The 0.45 s gap between different foes' starts holds even for a punish.
+	if used + cost > limit or (_since_attack < STAGGER and waited < STARVED_WAIT):
 		return false
 	_holders[id] = [cost, TOKEN_TIMEOUT]
 	_waiting.erase(id)

@@ -68,6 +68,9 @@ var _leap_in_velocity := Vector3.ZERO
 var _leap_in_time: float
 var _leap_in_duration: float
 var _stuck_time: float
+var _evaded_serial := -1
+var _tracked_serial := -1
+var _track_start_yaw: float
 var _unstick_time: float
 var _unstick_dir := Vector3.ZERO
 var _last_impact: float = 0.0
@@ -102,7 +105,7 @@ func _ready() -> void:
 	if boss_enabled:
 		# A boss is never bowled over, and only heavy, repeated blows make it flinch.
 		_combat.steady = true
-		_combat.poise = 120.0
+		_combat.poise = 100.0
 	_combat.defeated.connect(func() -> void: _director_release())
 	if boss_enabled:
 		_combat.max_health = 154.0
@@ -184,7 +187,9 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_watch_progress(motion, delta)
 	var local_velocity := _heading.global_basis.inverse() * get_real_velocity()
-	var local_motion := Vector2(local_velocity.x, local_velocity.z).limit_length(pursuit_speed) / pursuit_speed
+	# A foe told to stand (pursuit_speed 0) must not divide by zero: that fed NaN into the rig.
+	var gait_speed := maxf(pursuit_speed, 0.5)
+	var local_motion := Vector2(local_velocity.x, local_velocity.z).limit_length(gait_speed) / gait_speed
 	_rig.guard_up = mode == Mode.HUNT or not ai_enabled
 	_rig.track_velocity(get_real_velocity(), delta, _combat.action != &"")
 	_rig.apply_motion(_combat.clip(), _combat.pose_phase(), local_motion, delta)
@@ -437,6 +442,11 @@ func _try_evade(distance: float, away: Vector3) -> bool:
 	var threat: Node = player.get_node_or_null("Combat")
 	if threat == null or threat.attack == null or threat.action_age > threat.attack.windup * 0.7:
 		return false
+	# It has to see the windup first: 12-17 ticks for ordinary foes, 9-13 for quick ones. Then
+	# one decision per attack, so the chance does not depend on how long the windup lasts.
+	if threat.action_age < _reaction_delay() or threat.action_serial == _evaded_serial:
+		return false
+	_evaded_serial = threat.action_serial
 	if distance > threat.attack.reach + 0.6:
 		return false
 	_evade_cooldown = 1.4
@@ -449,11 +459,18 @@ func _try_evade(distance: float, away: Vector3) -> bool:
 	return _combat.start_roll(direction)
 
 
+func _reaction_delay() -> float:
+	var quick := pursuit_speed >= 4.0 or evade_chance >= 0.5
+	return (randf_range(9.0, 13.0) if quick else randf_range(12.0, 17.0)) / 60.0
+
+
 func _player_opening() -> bool:
 	var threat: Node = player.get_node_or_null("Combat")
 	if threat == null or randf() > punish_chance:
 		return false
-	if threat.action in [&"flinch", &"stagger", &"dazed", &"knockdown"] or threat.exhausted or threat.stamina < 12.0:
+	# Only what can be seen: a reeling hero or a swing in recovery. The hero's stamina and
+	# queued commands are not read.
+	if threat.action in [&"flinch", &"stagger", &"dazed", &"knockdown"]:
 		return true
 	return threat.attack != null and threat.action_age > threat.attack.windup + threat.attack.active
 
@@ -461,10 +478,19 @@ func _player_opening() -> bool:
 ## Swings track the player through the early windup, then commit.
 func _track_windup(delta: float) -> void:
 	var attack := _combat.attack
-	if attack == null or attack.spin or _combat.action_age > attack.windup * 0.75:
+	if attack == null or attack.spin:
 		return
+	if _combat.action_serial != _tracked_serial:
+		_tracked_serial = _combat.action_serial
+		_track_start_yaw = _heading.rotation.y
+	if _combat.action_age > attack.windup * 0.5:
+		return
+	# Tracking stops at mid windup, and never turns a swing more than 35 degrees (50 for big
+	# swings: heavies and bosses) from where it started.
+	var limit := deg_to_rad(50.0 if token_cost >= 2 or boss_enabled else 35.0)
 	var offset := player.global_position - global_position
-	_heading.rotation.y = rotate_toward(_heading.rotation.y, atan2(-offset.x, -offset.z), turn_rate * 0.6 * delta)
+	var wanted := clampf(angle_difference(_track_start_yaw, atan2(-offset.x, -offset.z)), -limit, limit)
+	_heading.rotation.y = rotate_toward(_heading.rotation.y, _track_start_yaw + wanted, turn_rate * 0.6 * delta)
 
 
 func _on_own_feedback(cue: StringName, _at: Vector3, _strength: float) -> void:

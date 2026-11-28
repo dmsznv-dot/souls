@@ -90,7 +90,12 @@ godot --headless --path . --script res://tests/weather.gd
 godot --headless --path . --script res://tests/poise.gd
 godot --headless --path . --script res://tests/dressing.gd
 godot --headless --path . --script res://tests/forest.gd
+godot --headless --path . --script res://tests/movement.gd
 ```
+
+`tools/run_tests.sh <godot>` runs every suite and also fails one that logs a script error or a
+non-finite value. Movement, input buffering, roll, stamina, parry, poise and lock-on follow the
+targets in [the movement and combat decisions log](docs/movement-and-combat.md).
 
 The courtyard, duelist and skeleton meshes, weapons, sounds and music were created for this project. [Motion sources](docs/motion-sources.md) describes the retargeted Quaternius clips. [Third-party assets](THIRD_PARTY.md) lists the Kenney models and their license. Development skills and their license are in `.agents/skills/`.
 

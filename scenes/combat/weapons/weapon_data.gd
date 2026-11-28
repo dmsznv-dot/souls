@@ -24,11 +24,6 @@ enum Form { SHORTSWORD, LONGSWORD, GREATSWORD, SPEAR, JAVELIN, DAGGER, KATANA, H
 @export_multiline var hint: String = ""
 
 
-## Walking speed multiplier while this weapon is held.
-func carry_factor() -> float:
-	return clampf(1.0 - maxf(0.0, mass - 2.0) * 0.012, 0.86, 1.0)
-
-
 func light(index: int) -> DuelAttack:
 	if light_chain.is_empty():
 		return null

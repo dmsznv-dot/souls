@@ -43,4 +43,5 @@ light_attack = ExtResource("2")
 heavy_attack = ExtResource("3")
 max_health = 170.0
 flinch_scale = 0.4
+poise = 65.0
 armor = &"hide"

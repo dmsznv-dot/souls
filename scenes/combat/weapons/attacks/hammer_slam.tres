@@ -5,19 +5,19 @@
 [resource]
 script = ExtResource("1")
 clip = &"slam"
-windup = 0.78
-active = 0.12
-recovery = 0.9
+windup = 0.7667
+active = 0.1333
+recovery = 0.8667
 damage = 50.0
 stamina_cost = 40.0
-block_cost = 70.0
+block_cost = 55.0
 posture_damage = 90.0
 reach = 2.4
 arc = 80.0
 lunge_speed = 1.6
 impact = 1.0
-chain_point = 0.5
-roll_cancel_point = 0.8
+chain_point = 1.0
+roll_cancel_point = 0.6731
 hyper_armor = true
 damage_type = 2
 shockwave_radius = 3.0

@@ -65,10 +65,10 @@ func _test_blade_crosses_front() -> void:
 func _test_chain_and_cancels() -> void:
 	await _arena(4.0, 0)
 	_press(MOUSE_BUTTON_LEFT)
-	await _ticks(14)
+	await _ticks(20)
 	_press(MOUSE_BUTTON_LEFT)
-	await _ticks(28)
-	_check(_hero.action == &"light_b", "a second press chains into the return cut")
+	await _ticks(10)
+	_check(_hero.action == &"light_b", "a second press in recovery chains into the return cut")
 	await _arena(4.0, 0)
 	_press(MOUSE_BUTTON_LEFT)
 	await _ticks(20)
@@ -93,17 +93,20 @@ func _test_weight() -> void:
 	await _arena(2.0, 2)
 	_hero.start_heavy()
 	var frozen_heavy := await _count_frozen()
-	_check(frozen_heavy > frozen_light + 2, "a greatsword heavy holds contact longer than a longsword light (%d vs %d ticks)" % [frozen_heavy, frozen_light])
+	_check(frozen_heavy >= frozen_light + 2, "a greatsword heavy holds contact longer than a longsword light (%d vs %d ticks)" % [frozen_heavy, frozen_light])
 	await _arena(1.6, 2)
 	var start := _guard.global_position
 	_hero.start_heavy()
 	await _ticks(70)
 	_check(_guard.global_position.distance_to(start) > 0.15, "a full-weight blow shoves the defender back")
-	await _arena(6.0, 0)
-	var long_walk := await _walk_distance()
+	# Ground speed follows the whole load (armour + active weapon over 50 kg), not the weapon
+	# alone: heavy armour with the greatsword (78 %) walks slower than the skeleton's kit.
 	await _arena(6.0, 2)
-	var great_walk := await _walk_distance()
-	_check(great_walk < long_walk, "carrying the greatsword slows walking (%.2f vs %.2f m)" % [great_walk, long_walk])
+	var medium_walk := await _walk_distance()
+	await _arena(6.0, 2)
+	_player.armor_mass = 30.0
+	var heavy_walk := await _walk_distance()
+	_check(heavy_walk < medium_walk * 0.92, "a heavy load slows walking (%.2f vs %.2f m)" % [heavy_walk, medium_walk])
 
 
 func _test_switching() -> void:

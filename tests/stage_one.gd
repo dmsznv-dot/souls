@@ -41,6 +41,9 @@ func _test_keyboard_movement() -> void:
 	var straight := _player.global_position - start
 	_check(straight.z < -1.0 and absf(straight.x) < 0.01, "W moves along camera forward")
 	_player.global_position = start
+	# Start the diagonal from rest, as the straight run did.
+	_player.drive = Vector3.ZERO
+	_player.velocity = Vector3.ZERO
 	_key(KEY_W, true)
 	_key(KEY_D, true)
 	await _ticks(24)

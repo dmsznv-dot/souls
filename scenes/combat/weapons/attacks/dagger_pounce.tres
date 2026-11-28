@@ -5,18 +5,18 @@
 [resource]
 script = ExtResource("1")
 clip = &"stab"
-windup = 0.16
+windup = 0.1833
 active = 0.1
-recovery = 0.3
+recovery = 0.3667
 damage = 15.0
 stamina_cost = 14.0
-block_cost = 14.0
+block_cost = 15.0
 posture_damage = 16.0
 reach = 2.4
 arc = 40.0
 lunge_speed = 6.0
 impact = 0.3
-chain_point = 0.3
-roll_cancel_point = 0.35
+chain_point = 1.0
+roll_cancel_point = 0.6364
 damage_type = 1
 backstab_multiplier = 2.5

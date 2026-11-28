@@ -11,11 +11,23 @@ signal weapon_changed(weapon: SoulsWeapon)
 const STAMINA_DELAY: float = 0.65
 const STAMINA_REGEN: float = 24.0
 const BLOCK_FACING: float = 0.5735764 # cos(55°)
-const ROLL_DURATION: float = 0.62
-## Invulnerable part of the roll. Dark Souls 1 grants 11-13 of 30 frames on medium and fast
-## rolls; this roll keeps a similar share of its length.
-const ROLL_IFRAMES := Vector2(0.05, 0.36)
-const PARRY_DURATION: float = 0.42
+## Medium-load roll: 39 ticks with i-frames on ticks [5, 21). Light and heavy loads pass their
+## own profile to start_roll (see player.gd LOAD_CLASSES).
+const ROLL_DURATION: float = 39.0 / 60.0
+const ROLL_IFRAMES := Vector2(5.0 / 60.0, 21.0 / 60.0)
+const ROLL_COST: float = 22.0
+## Parry: startup [0,4), active [4,11), recovery to 28 ticks. A success recovers in 10 ticks.
+const PARRY_DURATION: float = 28.0 / 60.0
+const PARRY_WINDOW := Vector2(4.0 / 60.0, 11.0 / 60.0)
+const PARRY_SUCCESS_RECOVERY: float = 10.0 / 60.0
+## Raising a guard takes 4 ticks before it blocks.
+const BLOCK_STARTUP: float = 4.0 / 60.0
+## Hit-stop by outcome, in ticks: blocks 2, parries 4 (hits take theirs from the attack).
+const BLOCK_HITSTOP: float = 2.0 / 60.0
+const PARRY_HITSTOP: float = 4.0 / 60.0
+## Flinch and stagger lengths of an ordinary poise break: 12 ticks, 22 from heavy blows.
+const FLINCH_TIME: float = 12.0 / 60.0
+const HEAVY_FLINCH_TIME: float = 22.0 / 60.0
 const PARRY_STAGGER: float = 0.98
 const COMBO_RESET: float = 0.45
 const FOCUS_REGEN: float = 6.0
@@ -36,8 +48,11 @@ const KNOCKDOWN_DURATION: float = 1.75
 ## Knocked down bodies lie still between these fractions of the knockdown; the player cannot be
 ## hit again while down, so heavies cannot chain a fallen hero to death.
 const KNOCKDOWN_LYING := Vector2(0.28, 0.72)
-## Running stamina dry stops regeneration this long, instead of the usual short delay.
-const EXHAUSTED_DELAY: float = 1.7
+## Running stamina dry stops regeneration 90 ticks, then it returns at 16/s until 35.
+const EXHAUSTED_DELAY: float = 1.5
+const EXHAUSTED_REGEN: float = 16.0
+## Regeneration while a raised guard is held, as a share of the normal rate.
+const BLOCK_REGEN_SHARE: float = 0.25
 ## Damage and poise multipliers for blows from the flank and from behind, for every weapon.
 const FLANK_BONUS := Vector2(1.08, 1.25)
 const REAR_BONUS := Vector2(1.2, 1.5)
@@ -67,6 +82,14 @@ var action_duration: float
 var attack: AttackData
 var blocking: bool
 var dodge_direction: Vector3
+## Roll profile of the roll in progress, fixed when it starts.
+var roll_duration: float = ROLL_DURATION
+var roll_iframes: Vector2 = ROLL_IFRAMES
+var roll_distance: float = 2.95
+## Seconds the block button has been held in a free state; the guard is up after BLOCK_STARTUP.
+var guard_raise: float
+## Increments on every new action: lets observers react once per attack.
+var action_serial: int
 var contact_frozen: bool
 ## Horizontal shove from the last blow, decays quickly. Body controllers add it to motion.
 var push: Vector3
@@ -128,9 +151,13 @@ func advance(delta: float) -> void:
 		action_age = minf(action_age + delta, action_duration)
 		return
 
+	guard_raise = guard_raise + delta if blocking and action == &"" else 0.0
 	_stamina_wait = maxf(0.0, _stamina_wait - delta)
-	if _stamina_wait == 0.0 and not blocking:
-		stamina = minf(100.0, stamina + STAMINA_REGEN * (0.7 if exhausted else 1.0) * delta)
+	if _stamina_wait == 0.0:
+		var rate := EXHAUSTED_REGEN if exhausted else STAMINA_REGEN
+		if blocking:
+			rate *= BLOCK_REGEN_SHARE
+		stamina = minf(100.0, stamina + rate * delta)
 		if exhausted and stamina >= 35.0:
 			exhausted = false
 	_poise_wait = maxf(0.0, _poise_wait - delta)
@@ -192,11 +219,10 @@ func start_attack(definition: AttackData) -> bool:
 
 ## Next swing of the weapon's light chain. Pressing again during recovery continues the chain.
 func start_light() -> bool:
-	var definition := light_attack
-	if weapon != null:
-		definition = weapon.light(combo_step)
-		if definition != null and focus < definition.focus_cost and weapon.fallback_light != null:
-			definition = weapon.fallback_light
+	if weapon != null and combo_step >= weapon.light_chain.size():
+		# After the last link the chain starts over from its first blow.
+		combo_step = 0
+	var definition := next_light()
 	if start_attack(definition):
 		combo_step += 1
 		return true
@@ -211,24 +237,60 @@ func start_heavy() -> bool:
 
 
 ## True once the current swing has recovered far enough to be cut short by the given action.
+## Windup and active never cancel. In recovery a roll may cut in at the roll point; the next
+## light only continues a multi-link chain, and the last link returns to idle first. Heavy,
+## parry, jump and weapon changes wait for idle.
 func can_cancel_into(next: StringName) -> bool:
 	if attack == null or attack.projectile_speed > 0.0 or contact_frozen:
 		return false
 	var recovery_start := attack.windup + attack.active
-	var point := attack.roll_cancel_point if next == &"roll" else attack.chain_point
-	return action_age >= recovery_start + attack.recovery * point
+	if next == &"roll":
+		return action_age >= recovery_start + attack.recovery * attack.roll_cancel_point
+	if next == &"light_attack":
+		if weapon == null or weapon.light_chain.size() < 2 or combo_step >= weapon.light_chain.size():
+			return false
+		if attack.chain_point >= 1.0:
+			return false
+		return action_age >= recovery_start + attack.recovery * attack.chain_point
+	return false
+
+
+## The light attack the next press would start (the chain link, or the focus-free fallback).
+func next_light() -> AttackData:
+	if weapon == null:
+		return light_attack
+	var step := combo_step if combo_step < weapon.light_chain.size() else 0
+	var definition := weapon.light(step)
+	if definition != null and focus < definition.focus_cost and weapon.fallback_light != null:
+		definition = weapon.fallback_light
+	return definition
+
+
+## Says why a press was refused (tired, no focus) without spending anything.
+func emit_refusal(command: StringName) -> void:
+	if command == &"light_attack" or command == &"heavy_attack":
+		var definition := next_light() if command == &"light_attack" else heavy_attack
+		if definition != null and focus < definition.focus_cost:
+			_emit(&"no_focus")
+			return
+	_emit(&"tired")
 
 
 func cancel_recovery() -> void:
 	_set_action(&"", 0.0)
 
 
-func start_roll(direction: Vector3) -> bool:
-	if action != &"" or not body.is_on_floor() or not _spend(22.0):
+## profile: [duration, i-frames Vector2, free distance, stamina cost]; defaults are medium load.
+func start_roll(direction: Vector3, profile: Array = []) -> bool:
+	var cost: float = profile[3] if profile.size() == 4 else ROLL_COST
+	if action != &"" or not body.is_on_floor() or not _spend(cost):
 		return false
 	dodge_direction = direction.normalized()
 	combo_step = 0
-	_set_action(&"roll", ROLL_DURATION)
+	roll_duration = profile[0] if profile.size() == 4 else ROLL_DURATION
+	roll_iframes = profile[1] if profile.size() == 4 else ROLL_IFRAMES
+	roll_distance = profile[2] if profile.size() == 4 else 2.95
+	_set_action(&"roll", roll_duration)
 	_emit(&"roll")
 	return true
 
@@ -297,14 +359,18 @@ func _holding(delta: float) -> bool:
 
 ## Hyper armour: the windup and strike of a swing whose attack grants it.
 func hyper_armor() -> bool:
-	return attack != null and attack.hyper_armor and action_age < attack.windup + attack.active
+	return (attack != null and attack.hyper_armor and action_age >= attack.windup * attack.hyper_armor_start
+			and action_age < attack.windup + attack.active)
 
 
 func is_invulnerable() -> bool:
 	if action == &"knockdown" and opponent_mask == 4:
 		var lying := action_age / KNOCKDOWN_DURATION
 		return lying >= KNOCKDOWN_LYING.x and lying <= KNOCKDOWN_LYING.y
-	return action == &"roll" and action_age >= ROLL_IFRAMES.x and action_age <= ROLL_IFRAMES.y
+	# Leaving the ground closes a ground roll's protection.
+	# Half-tick tolerance: ages accumulate in doubles, the window is stored in single floats.
+	return (action == &"roll" and action_age + 0.004 >= roll_iframes.x and action_age + 0.004 < roll_iframes.y
+			and body.is_on_floor())
 
 
 ## Poise damage this body soaks before a blow staggers it.
@@ -327,15 +393,14 @@ func receive_attack(attacker: Node, incoming: AttackData, shot_source_direction:
 	var frontal := -heading.global_basis.z.dot(towards_attacker.normalized()) >= BLOCK_FACING
 	_contact_time = incoming.hit_stop()
 
-	if frontal and action == &"parry" and action_age >= 0.035 and action_age <= 0.20:
-		if not projectile:
-			attacker.interrupt_for_parry()
-		_set_action(&"parry", 0.13)
-		action_age = 0.05
-		_contact_time = 0.075
+	if frontal and not projectile and action == &"parry" and action_age + 0.004 >= PARRY_WINDOW.x and action_age + 0.004 < PARRY_WINDOW.y:
+		attacker.interrupt_for_parry()
+		_set_action(&"parry", PARRY_SUCCESS_RECOVERY)
+		_contact_time = PARRY_HITSTOP
 		_emit(&"parry", 0.8)
 		return true
-	if frontal and blocking and action == &"":
+	if frontal and guarding():
+		_contact_time = BLOCK_HITSTOP
 		var could_hold := stamina > incoming.block_cost
 		_spend(minf(stamina, incoming.block_cost))
 		_stamina_wait = maxf(_stamina_wait, STAMINA_DELAY)
@@ -393,10 +458,10 @@ func receive_attack(attacker: Node, incoming: AttackData, shot_source_direction:
 	elif hyper_armor() and _poise_damage < poise_limit() * 2.0:
 		# Committed heavy swings ride through blows, as in Souls games, unless battered hard.
 		pass
-	elif was == &"dazed" or (was != &"stagger" and (player or _poise_damage >= poise_limit())):
-		# The player always flinches; foes once the blows outweigh their poise.
+	elif was == &"dazed" or (was != &"stagger" and _poise_damage >= poise_limit()):
+		# Hero and foes alike flinch once the blows outweigh their poise (hero: 28).
 		_poise_damage = 0.0
-		_set_action(&"flinch", lerpf(0.3, 0.42, incoming.impact) * clampf(flinch_scale, 0.7, 1.4))
+		_set_action(&"flinch", HEAVY_FLINCH_TIME if incoming.impact >= 0.65 else FLINCH_TIME)
 	return true
 
 
@@ -432,6 +497,11 @@ func impact_material() -> String:
 		&"bone": return "bone"
 		&"hide": return "hide"
 	return "flesh"
+
+
+## A raised guard: held in a free state for the 4-tick startup.
+func guarding() -> bool:
+	return blocking and action == &"" and guard_raise >= BLOCK_STARTUP
 
 
 func interrupt_for_parry() -> void:
@@ -482,8 +552,8 @@ func movement_weight() -> float:
 		var recovery_start := attack.windup + attack.active
 		return smoothstep(recovery_start + attack.recovery * 0.55, action_duration, action_age)
 	if action == &"":
-		var carry := weapon.carry_factor() if weapon != null else 1.0
-		return (0.38 if blocking else 1.0) * carry
+		# Guarding walks at 0.55; the overall load class scales ground speed in the controller.
+		return 0.55 if blocking else 1.0
 	return 0.0
 
 
@@ -491,6 +561,7 @@ func _set_action(next: StringName, duration: float) -> void:
 	action = next
 	action_duration = duration
 	action_age = 0.0
+	action_serial += 1
 	attack = null
 	_parried = false
 	_hit_bodies.clear()
@@ -501,21 +572,36 @@ func _set_action(next: StringName, duration: float) -> void:
 		blocking = false
 
 
-## Actions need at least half their cost in stamina; the rest is taken from an empty bar, which
-## leaves the body exhausted (Souls games let any stamina above zero start an action).
+## Actions need their full cost up front; landing on exactly zero is allowed and exhausts.
 func _spend(cost: float) -> bool:
-	if stamina < cost * 0.5 or (cost > 0.0 and stamina < 1.0):
+	if not can_afford(cost):
 		_emit(&"tired")
 		return false
 	if cost > 0.0:
 		stamina = maxf(0.0, stamina - cost)
 		_stamina_wait = STAMINA_DELAY
-		if stamina < 1.0 and not exhausted:
-			# Running dry costs more than one short pause: regeneration stalls, then crawls.
-			exhausted = true
-			_stamina_wait = EXHAUSTED_DELAY
-			_emit(&"exhausted")
+		_check_exhausted()
 	return true
+
+
+func can_afford(cost: float) -> bool:
+	return stamina + 0.0001 >= cost
+
+
+## Drains stamina outside an action (sprinting): no regeneration this tick or for the usual pause.
+func drain(amount: float) -> void:
+	stamina = maxf(0.0, stamina - amount)
+	_stamina_wait = maxf(_stamina_wait, STAMINA_DELAY)
+	_check_exhausted()
+
+
+## Running dry costs more than one short pause: regeneration stalls, then crawls.
+func _check_exhausted() -> void:
+	if stamina <= 0.0001 and not exhausted:
+		stamina = 0.0
+		exhausted = true
+		_stamina_wait = EXHAUSTED_DELAY
+		_emit(&"exhausted")
 
 
 func _damage(amount: float) -> void:

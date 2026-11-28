@@ -1,15 +1,20 @@
 extends Node3D
 
 @export_range(0.001, 0.015, 0.0001) var mouse_sensitivity: float = 0.0035
-@export_range(0.5, 6.0, 0.1, "suffix:rad/s") var stick_speed: float = 2.6
-@export_range(0.5, 10.0, 0.1, "suffix:m/s") var camera_return_speed: float = 3.8
-@export_range(1.0, 50.0, 0.5, "suffix:m") var lock_range: float = 20.0
+## Right stick: 160 deg/s. Mouse deltas are used as they come, never scaled by delta.
+@export_range(0.5, 6.0, 0.01, "suffix:rad/s") var stick_speed: float = 2.79
+@export_range(0.5, 10.0, 0.1, "suffix:m/s") var camera_return_speed: float = 4.0
+## Acquire a target within this range; keep it until it passes hold_range.
+@export_range(1.0, 50.0, 0.5, "suffix:m") var lock_range: float = 18.0
+@export_range(1.0, 50.0, 0.5, "suffix:m") var hold_range: float = 21.0
+## Candidates must lie within this yaw of the camera's centre.
+@export_range(10.0, 90.0, 1.0, "degrees") var lock_yaw_limit: float = 55.0
 @export_range(0.05, 1.0, 0.01, "suffix:s") var occlusion_grace_time: float = 0.35
 @export_range(-0.4, 0.4, 0.01, "suffix:rad") var lock_yaw_offset: float = 0.0
 @export_flags_3d_physics var sight_collision_mask: int = 1
 ## How quickly the rig catches up with the body. Lower values trail more and read as weight.
-@export_range(1.0, 40.0, 0.5) var follow_rate: float = 14.0
-@export_range(1.0, 40.0, 0.5) var vertical_follow_rate: float = 7.0
+@export_range(1.0, 40.0, 0.5) var follow_rate: float = 16.0
+@export_range(1.0, 40.0, 0.5) var vertical_follow_rate: float = 8.0
 ## Player setting, 0..1. Scales screen shake.
 @export_range(0.0, 1.0, 0.05) var shake_strength: float = 1.0
 
@@ -127,7 +132,7 @@ func _process(delta: float) -> void:
 	# interpolation can smooth them on high-refresh displays.
 	_update_shake(delta)
 	var body := get_parent()
-	var sprint_fov: float = _base_fov + (5.0 if body.get(&"sprinting") else 0.0)
+	var sprint_fov: float = _base_fov + (4.0 if body.get(&"sprinting") else 0.0)
 	_camera.fov = lerpf(_camera.fov, sprint_fov, 1.0 - exp(-4.0 * delta))
 
 
@@ -147,7 +152,11 @@ func _update_shake(delta: float) -> void:
 
 
 func _update_lock(delta: float) -> void:
-	if is_instance_valid(lock_target) and lock_target.is_visible_in_tree():
+	if (is_instance_valid(lock_target) and lock_target.is_visible_in_tree()
+			and get_parent().global_position.distance_to(lock_target.global_position) > hold_range):
+		# Beyond the hold range the lock lets go (acquired within 18 m, kept up to 21 m).
+		lock_target = null
+	elif is_instance_valid(lock_target) and lock_target.is_visible_in_tree():
 		if _can_see_target(lock_target.global_position):
 			_occlusion_time = 0.0
 		else:
@@ -169,7 +178,7 @@ func _update_lock(delta: float) -> void:
 ## Moves the lock to the nearest other target on that side of the screen (-1 left, 1 right).
 func switch_target(side: float) -> bool:
 	_switch_push = 0.0
-	_switch_cooldown = 0.3
+	_switch_cooldown = 0.25
 	if not is_instance_valid(lock_target):
 		return false
 	var current := _camera.unproject_position(lock_target.global_position)
@@ -184,7 +193,8 @@ func switch_target(side: float) -> bool:
 				or not _camera.is_position_in_frustum(point) or not _can_see_target(point)):
 			continue
 		var gap := (_camera.unproject_position(point).x - current.x) * side
-		if gap > 4.0 and gap < best_gap:
+		# A switch must move at least 3 % of the viewport width.
+		if gap > get_viewport().get_visible_rect().size.x * 0.03 and gap < best_gap:
 			best = target
 			best_gap = gap
 	if best == null:
@@ -194,22 +204,35 @@ func switch_target(side: float) -> bool:
 	return true
 
 
+## Best candidate by 0.70 x distance from screen centre (over the half viewport) + 0.30 x
+## distance over the acquire range. Dead, hidden, behind-camera and off-centre (beyond 55 deg
+## of yaw) targets are dropped before projection; ties go to the lower instance id.
 func _find_target() -> Marker3D:
 	var best_target: Marker3D
-	var best_alignment := -1.0
+	var best_score := INF
+	var half := get_viewport().get_visible_rect().size * 0.5
+	var hero: Vector3 = get_parent().global_position
+	var forward := -_camera.global_basis.z
+	forward.y = 0.0
+	forward = forward.normalized()
 	for node in get_tree().get_nodes_in_group(&"lock_targets"):
 		var target := node as Marker3D
 		if target == null or not target.is_visible_in_tree():
 			continue
 		var point := target.global_position
-		if (global_position.distance_squared_to(point) > lock_range * lock_range
-				or not _camera.is_position_in_frustum(point)):
+		var distance := hero.distance_to(point)
+		if distance > lock_range or _camera.is_position_behind(point) or not _camera.is_position_in_frustum(point):
 			continue
-		var direction := _camera.global_position.direction_to(point)
-		var alignment := -_camera.global_basis.z.dot(direction)
-		if alignment > best_alignment and _can_see_target(point):
-			best_target = target
-			best_alignment = alignment
+		var flat := point - _camera.global_position
+		flat.y = 0.0
+		if flat.length_squared() > 0.0001 and rad_to_deg(forward.angle_to(flat.normalized())) > lock_yaw_limit:
+			continue
+		var screen := (_camera.unproject_position(point) - half) / half
+		var score := 0.7 * screen.length() + 0.3 * distance / lock_range
+		if score < best_score - 0.0001 or (absf(score - best_score) <= 0.0001 and best_target != null and target.get_instance_id() < best_target.get_instance_id()):
+			if _can_see_target(point):
+				best_target = target
+				best_score = score
 	return best_target
 
 

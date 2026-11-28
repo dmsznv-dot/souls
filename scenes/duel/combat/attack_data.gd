@@ -24,6 +24,8 @@ enum DamageType { SLASH, PIERCE, IMPACT, MAGIC }
 @export_range(0.0, 1.0, 0.01) var roll_cancel_point: float = 0.55
 ## Light blows landing during windup and strike do not interrupt this attack.
 @export var hyper_armor: bool = false
+## Share of the windup after which hyper armour starts (0 = from the first tick).
+@export_range(0.0, 1.0, 0.01) var hyper_armor_start: float = 0.0
 @export var damage_type: DamageType = DamageType.SLASH
 ## Focus (magic meter) spent to start the attack.
 @export_range(0.0, 100.0, 1.0) var focus_cost: float = 0.0
@@ -49,8 +51,12 @@ enum DamageType { SLASH, PIERCE, IMPACT, MAGIC }
 @export_range(0.0, 90.0, 1.0, "degrees") var projectile_spread: float = 0.0
 
 
+## Local hit-stop of a clean hit: 2 ticks for light blows (impact < 0.30), 3 for medium,
+## 5 for heavy (impact >= 0.65).
 func hit_stop() -> float:
-	return lerpf(0.04, 0.12, impact)
+	if impact < 0.3:
+		return 2.0 / 60.0
+	return (3.0 if impact < 0.65 else 5.0) / 60.0
 
 
 func knockback() -> float:

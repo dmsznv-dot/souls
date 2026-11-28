@@ -5,18 +5,18 @@
 [resource]
 script = ExtResource("1")
 clip = &"light"
-windup = 0.46
-active = 0.14
+windup = 0.45
+active = 0.1333
 recovery = 0.6
 damage = 40.0
 stamina_cost = 28.0
-block_cost = 55.0
+block_cost = 38.0
 posture_damage = 66.0
 reach = 2.3
 arc = 110.0
 lunge_speed = 2.0
 impact = 0.88
-chain_point = 0.45
-roll_cancel_point = 0.75
+chain_point = 1.0
+roll_cancel_point = 0.6667
 hyper_armor = true
 damage_type = 2

@@ -14,8 +14,6 @@
 [ext_resource type="Resource" path="res://scenes/combat/weapons/greatsword.tres" id="9_great"]
 
 [node name="Player" instance=ExtResource("1_player")]
-move_acceleration = 38.0
-move_deceleration = 24.0
 weapons = Array[ExtResource("6_weapon")]([ExtResource("7_long"), ExtResource("8_katana"), ExtResource("9_great"), ExtResource("10_dagger"), ExtResource("11_hammer"), ExtResource("12_staff")])
 
 [node name="Cloak" parent="Heading" index="0"]

@@ -33,4 +33,5 @@ light_attack = ExtResource("2")
 heavy_attack = ExtResource("3")
 max_health = 55.0
 flinch_scale = 2.5
+poise = 12.0
 armor = &"cloth"

@@ -5,16 +5,16 @@
 [resource]
 script = ExtResource("1")
 clip = &"dash_slash"
-windup = 0.2
-active = 0.13
-recovery = 0.42
+windup = 0.25
+active = 0.1167
+recovery = 0.4333
 damage = 26.0
 stamina_cost = 22.0
-block_cost = 24.0
+block_cost = 27.0
 posture_damage = 32.0
 reach = 3.6
 arc = 110.0
 lunge_speed = 8.5
 impact = 0.5
-chain_point = 0.4
-roll_cancel_point = 0.5
+chain_point = 1.0
+roll_cancel_point = 0.6538

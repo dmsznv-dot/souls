@@ -56,27 +56,48 @@ func _test_player_attacks() -> void:
 	_check(_guard_combat.health == 50.0, "rejected attack does not deal damage")
 
 
+## Command buffer and cancel windows (spec T1/T2). Longsword L1: windup 11, active 6,
+## recovery 19 ticks; the chain opens 7 ticks into recovery (age 24), the roll at 11 (age 28).
 func _test_buffer() -> void:
+	await _arena()
+	_hero_combat.start_light()
+	var l1: DuelAttack = _hero_combat.attack
+	_hero_combat.action_age = 23.0 / 60.0
+	var early: bool = _hero_combat.can_cancel_into(&"light_attack")
+	_hero_combat.action_age = 24.0 / 60.0
+	var on_time: bool = _hero_combat.can_cancel_into(&"light_attack")
+	_hero_combat.action_age = 27.0 / 60.0
+	var roll_early: bool = _hero_combat.can_cancel_into(&"roll")
+	_hero_combat.action_age = 28.0 / 60.0
+	var roll_on_time: bool = _hero_combat.can_cancel_into(&"roll")
+	_check(not early and on_time and not roll_early and roll_on_time and not _hero_combat.can_cancel_into(&"heavy_attack"),
+		"L1 chains from tick 24 and rolls from tick 28, never earlier; heavy waits for idle")
+	_check(l1 != null, "the longsword's first link is in play")
+
 	await _arena()
 	_press_mouse()
 	_press_mouse(false)
-	await _ticks(28)
-	_key(KEY_R)
+	await _ticks(20)
+	_press_mouse()
+	_press_mouse(false)
 	await _ticks(9)
-	_check(_hero_combat.action == &"heavy", "press inside the 120 ms recovery buffer starts next action")
+	_check(_hero_combat.combo_step == 2, "a press within its 10-tick life chains when the window opens (hit-stop included)")
+
 	await _arena()
 	_press_mouse()
 	_press_mouse(false)
 	await _ticks(7)
 	_key(KEY_R)
-	await _ticks(20)
-	_check(_hero_combat.action == &"heavy", "press during the windup is held until the swing's cancel point")
+	await _ticks(40)
+	_check(_hero_combat.action == &"" or _hero_combat.attack != _hero_combat.heavy_attack,
+		"a heavy pressed in the windup expires (10 ticks) before the swing returns to idle")
+
 	await _arena()
 	_key(KEY_SPACE)
 	await _ticks(3)
 	_press_mouse()
 	_press_mouse(false)
-	await _ticks(36)
+	await _ticks(40)
 	_check(_hero_combat.action == &"", "a press early in a roll expires before the roll ends")
 
 

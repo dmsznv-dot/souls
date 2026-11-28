@@ -110,18 +110,43 @@ func _test_flank() -> void:
 	_check(rear.x > 1.1 and rear.y > 1.3, "a blow from behind hits harder and breaks poise faster (%.2f, %.2f)" % [rear.x, rear.y])
 
 
+## Spec D4: full cost up front, exactly zero allowed; 90 ticks without regeneration once dry,
+## then 16/s to 35; a raised guard regenerates at a quarter rate; a sprint costs 13/s and stops
+## regeneration while it runs.
 func _test_exhaustion() -> void:
 	await _arena()
 	await _ticks(20)
 	var combat := _hero.get_node("Combat")
-	combat.stamina = 14.0
-	combat.start_roll(Vector3.FORWARD)
-	_check(combat.exhausted, "running stamina dry leaves the hero exhausted")
+	combat.stamina = 21.9
+	_check(not combat.start_roll(Vector3.FORWARD), "an action short of its full cost does not start")
+	combat.stamina = 22.0
+	_check(combat.start_roll(Vector3.FORWARD) and combat.exhausted, "spending down to exactly zero is allowed and exhausts")
+	await _ticks(88)
+	_check(combat.stamina < 0.01, "no regeneration for 90 ticks after running dry (%.2f)" % combat.stamina)
+	await _ticks(62)
+	_check(combat.stamina > 12.0 and combat.stamina < 20.0, "then a slow 16/s (%.1f after one second)" % combat.stamina)
+
+	await _arena()
+	await _ticks(10)
+	combat = _hero.get_node("Combat")
+	combat.stamina = 50.0
+	Input.action_press(&"block")
 	await _ticks(60)
-	var after_second: float = combat.stamina
-	_check(after_second < 2.0, "an exhausted hero regains nothing for over a second (%.1f)" % after_second)
-	await _ticks(150)
-	_check(combat.stamina > 15.0, "then stamina returns")
+	var guarded: float = combat.stamina - 50.0
+	Input.action_release(&"block")
+	_check(guarded > 3.0 and guarded < 9.0, "holding a guard regenerates at a quarter rate (%.1f in one second)" % guarded)
+
+	await _arena()
+	await _ticks(10)
+	combat = _hero.get_node("Combat")
+	combat.stamina = 60.0
+	Input.action_press(&"move_forward")
+	Input.action_press(&"sprint")
+	await _ticks(60)
+	var sprinted: float = combat.stamina
+	Input.action_release(&"sprint")
+	Input.action_release(&"move_forward")
+	_check(sprinted < 48.5 and sprinted > 45.0, "a sprint costs 13 stamina a second and stops regeneration (%.1f left of 60)" % sprinted)
 
 
 func _test_response_window() -> void:

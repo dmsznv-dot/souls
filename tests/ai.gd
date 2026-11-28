@@ -95,12 +95,14 @@ func _test_evasion_and_tracking() -> void:
 	spear._evade_cooldown = 0.0
 	var rolled := false
 	_hero.get_node("Heading").rotation.y = 0.0
-	_hero.get_node("Combat").start_light()
-	for i in 20:
+	# Foes need 9-17 ticks to read a windup: a heavy's 25-tick windup can be read and rolled
+	# away from; a light's 11 ticks cannot (checked below).
+	_hero.get_node("Combat").start_heavy()
+	for i in 30:
 		await physics_frame
 		if spear.get_node("Combat").action == &"roll":
 			rolled = true
-	_check(rolled, "a nimble foe rolls away from a swing that would reach it")
+	_check(rolled, "a nimble foe rolls away from a slow swing that would reach it")
 
 	await _arena()
 	var husk := _spawn("husk", Vector3(0, 0, -1.6), false)
