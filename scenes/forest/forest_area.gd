@@ -23,6 +23,7 @@ const Belfry = preload("res://scenes/zones/belfry_area.gd")
 const Props = preload("res://scenes/forest/forest_props.gd")
 const NoirLighting = preload("res://scenes/fx/noir_lighting.gd")
 const Combatant = preload("res://scenes/duel/combat/combatant.gd")
+const Marks = preload("res://scenes/debug/perf_marks.gd")
 const KINDS := {
 	&"hollow": ["res://scenes/expedition/enemies/husk.tscn", "HOLLOW WOODSMAN", Color(0.28, 0.33, 0.22)],
 	&"crawler": ["res://scenes/expedition/enemies/ghoul.tscn", "THORN CRAWLER", Color(0.22, 0.32, 0.2)],
@@ -38,6 +39,10 @@ const AMBUSHES := [
 	[184.0, [[&"hollow", 1, 7.0], [&"crawler", -1, 8.0]]],
 ]
 const LANTERN_SPACING := 15.0
+## A zone is built when the player is closer than x metres to its entry and freed beyond y.
+const ZONE_LOAD := Vector2(100.0, 150.0)
+const ZONE_FOES := ["res://scenes/expedition/enemies/spearman.tscn", "res://scenes/expedition/enemies/shieldbearer.tscn",
+		"res://scenes/expedition/enemies/husk.tscn", "res://scenes/expedition/enemies/ghoul.tscn"]
 const REST_DISTANCE := 2.6
 const MOON_ENERGY := 2.1
 
@@ -75,7 +80,9 @@ func setup(hero: CharacterBody3D, streamed: bool) -> void:
 	_streamed = streamed
 	if world == null:
 		await _build(get_tree() if streamed else null)
-	await reset_foes(streamed)
+	# The zones have just spawned their own foes; only the forest's ambushes are new.
+	await reset_foes(streamed, false)
+	Marks.mark(self, &"forest:night_loop")
 	_night = AudioStreamPlayer.new()
 	_night.name = "NightAmbience"
 	var loop := load("res://assets/audio/ambience/forest_night.ogg") as AudioStream
@@ -92,9 +99,11 @@ func setup(hero: CharacterBody3D, streamed: bool) -> void:
 	var accents := [to_global(Vector3(world.road_x(-30.0) - 9.0, 3.0, -30.0)), to_global(Vector3(world.road_x(-120.0) + 10.0, 3.5, -120.0))]
 	if streamed:
 		await get_tree().process_frame
+	Marks.mark(self, &"forest:noir")
 	NoirLighting.apply(self, accents)
 	if streamed:
 		await get_tree().process_frame
+	Marks.mark(self, &"forest:fires")
 	for light in find_children("*", "DirectionalLight3D", true, false):
 		tune_moon(light)
 	_tune_fires()
@@ -107,14 +116,19 @@ func _build(tree: SceneTree) -> void:
 	var ground := Node3D.new()
 	ground.name = "Ground"
 	add_child(ground)
+	Marks.mark(self, &"forest:world")
 	await world.build(ground, tree)
+	Marks.mark(self, &"forest:compositions")
 	props = await compositions.build(self, tree)
+	Marks.mark(self, &"forest:lights")
 	_register_obstacles()
 	_place_lights()
 	if tree != null:
 		await tree.process_frame
+	Marks.mark(self, &"forest:arrival")
 	_place_arrival()
 	await _build_zones(tree)
+	Marks.mark(self, &"forest:bonfire")
 	_bonfire = Props.bonfire()
 	add_child(_bonfire)
 	_attach_bonfire_fire()
@@ -137,12 +151,13 @@ func _build(tree: SceneTree) -> void:
 	_navigation = NavigationRegion3D.new()
 	_navigation.name = "Navigation"
 	add_child(_navigation)
+	Marks.mark(self, &"forest:navigation_source")
 	await _bake_navigation(tree)
 
 
 ## The crossing starts where the corridor leaves the clearing, level with it; the belfry where
 ## the crossing's stone steps end.
-func _build_zones(tree: SceneTree) -> void:
+func _build_zones(_tree: SceneTree) -> void:
 	crossing = Crossing.new()
 	crossing.name = "FloodedCrossing"
 	add_child(crossing)
@@ -154,7 +169,46 @@ func _build_zones(tree: SceneTree) -> void:
 	for area in [crossing, belfry]:
 		area.foe_spawned.connect(func(foe: CharacterBody3D) -> void: foe_spawned.emit(foe))
 		area.enemy_defeated.connect(func(foe: CharacterBody3D) -> void: enemy_defeated.emit(foe))
-		await area.prepare(player, tree != null)
+
+
+## The zones are built when the player comes near and freed when they are far behind (with a
+## gap between the two distances, so walking to and fro does not rebuild them). A zone the
+## player is in, or the belfry while it is the place to rise, always stays.
+func _stream_zones() -> void:
+	for spec: Array in [[crossing, ZONE_LOAD.x, ZONE_LOAD.y, &"crossing"], [belfry, ZONE_LOAD.x + 10.0, ZONE_LOAD.y + 10.0, &"belfry"]]:
+		var area: Node3D = spec[0]
+		if area == null:
+			continue
+		var distance: float = area.global_position.distance_to(player.global_position)
+		var keep: bool = zone == spec[3] or (checkpoint == &"belfry")
+		if not area.prepared and distance < spec[1]:
+			_prepare_zone(area)
+		elif area.prepared and distance > spec[2] and not keep:
+			Marks.mark(self, StringName(String(spec[3]) + ":unload"))
+			area.unload()
+
+
+func _prepare_zone(area: Node3D) -> void:
+	await area.prepare(player, true)
+	if not is_instance_valid(area) or not area.prepared:
+		return
+	# The player may already be inside (or the forest asleep): match its state now.
+	var inside: bool = active and (area == crossing and zone == &"crossing" or area == belfry and zone == &"belfry")
+	if inside:
+		area.activate()
+	else:
+		area.deactivate()
+
+
+## Every foe scene the forest and its zones spawn, for loading ahead on worker threads.
+static func foe_scenes() -> Array:
+	var paths := []
+	for kind: StringName in KINDS:
+		paths.append(KINDS[kind][0])
+	for path: String in ZONE_FOES:
+		if not paths.has(path):
+			paths.append(path)
+	return paths
 
 
 ## The moon of the Thornwood: high, cold and strong, so the canopy throws hard shadows and the
@@ -385,6 +439,7 @@ func _bake_navigation(tree: SceneTree) -> void:
 func _navigation_baked(mesh: NavigationMesh) -> void:
 	if not is_inside_tree() or mesh.get_polygon_count() == 0:
 		return
+	Marks.mark(self, &"forest:navigation_settle")
 	# Recast floats the mesh a cell or two above uneven ground; snap it back onto the terrain
 	# and drop islands on top of trunks, rocks and bounds.
 	var vertices := mesh.vertices
@@ -436,11 +491,12 @@ func engaged() -> bool:
 	return enemies().any(func(enemy: Node) -> bool: return enemy.visible and enemy.is_engaged())
 
 
-## Clears every foe and sets all ambushes again, each foe hidden in the trees.
-func reset_foes(paced: bool = false) -> void:
+## Clears every foe and sets all ambushes again, each foe hidden in the trees. Paced: one foe
+## per frame (streaming); zones: also reset the crossing's and the belfry's foes.
+func reset_foes(paced: bool = false, zones: bool = true) -> void:
 	for area in [crossing, belfry]:
-		if area != null and area.prepared:
-			area.reset_foes()
+		if zones and area != null and area.prepared:
+			await area.reset_foes(paced)
 	for prop in props:
 		if is_instance_valid(prop):
 			prop.reset()
@@ -451,6 +507,7 @@ func reset_foes(paced: bool = false) -> void:
 	for ambush: Array in AMBUSHES:
 		var foes := []
 		for spec: Array in ambush[1]:
+			Marks.mark(self, StringName("foe:" + String(spec[0])))
 			foes.append(_spawn_hidden(ambush[0], spec))
 			if paced:
 				await get_tree().process_frame
@@ -522,6 +579,8 @@ func _hide(foe: CharacterBody3D, hidden: bool) -> void:
 func _physics_process(_delta: float) -> void:
 	if not built or player == null or not active:
 		return
+	if Engine.get_physics_frames() % 15 == 0:
+		_stream_zones()
 	_track_zone()
 	if zone != &"forest":
 		return

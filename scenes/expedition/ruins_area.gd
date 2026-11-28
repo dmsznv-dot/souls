@@ -7,6 +7,8 @@ signal enemy_defeated(enemy: CharacterBody3D)
 signal cleared
 ## The player stepped into the opened eclipse ring.
 signal portal_entered
+## Setup finished (dressing, navigation and lighting in place).
+signal set_up
 
 const Combatant = preload("res://scenes/duel/combat/combatant.gd")
 const DISSOLVE := preload("res://scenes/expedition/gate/gate_dissolve.gdshader")
@@ -29,8 +31,11 @@ const ENTRANCE_HALF_WIDTH := 1.45
 
 var remaining: int
 var portal: EclipsePortal
+var is_set_up := false
 
 
+## Streamed, the heavy parts (dressing, navigation, lighting) are spread over frames: await it.
+## The portal exists as soon as this is called.
 func setup(player: CharacterBody3D, streamed: bool) -> void:
 	for enemy: CharacterBody3D in enemies():
 		enemy.player = player
@@ -42,20 +47,29 @@ func setup(player: CharacterBody3D, streamed: bool) -> void:
 		$Environment/WorldEnvironment.free()
 		$Environment/EveningLight.free()
 		open_entrance()
-	# Dressing first, so the lighting pass styles its fires and materials; then foes are routed
-	# around everything that now stands on the road.
-	SetDressing.dress($Environment, Dressing.LAYOUT)
 	if portal == null:
 		portal = EclipsePortal.new()
 		portal.name = "EclipsePortal"
 		add_child(portal)
 		portal.entered.connect(func() -> void: portal_entered.emit())
 	portal.player = player
-	SetDressing.rebake_navigation($Environment/AqueductWalk, $Environment, NAV_BOUNDS)
+	var tree := get_tree() if streamed else null
+	# Dressing first, so the lighting pass styles its fires and materials; then foes are routed
+	# around everything that now stands on the road.
+	await SetDressing.dress($Environment, Dressing.LAYOUT, 7, tree)
+	if not is_inside_tree():
+		return
+	await SetDressing.rebake_navigation($Environment/AqueductWalk, $Environment, NAV_BOUNDS, 1.0, tree)
+	if not is_inside_tree():
+		return
+	if streamed:
+		await get_tree().process_frame
 	var accents := []
 	for point: Vector3 in ACCENTS:
 		accents.append(global_transform * point)
 	NoirLighting.apply(self, accents)
+	is_set_up = true
+	set_up.emit()
 
 
 ## The ruins are the threshold: once they fall silent the eclipse ring opens onward.

@@ -63,9 +63,10 @@ player keeps control. Arrival clears speed, queued commands and the lock. Ambush
 ## Zones
 
 Both are built by `scenes/zones/zone_area.gd` subclasses with `prepare -> activate ->
-deactivate`: geometry in the project's materials, lights, foes, breakables, navigation baked
-on a thread when streamed and settled onto the floor. The forest builds both and tracks which
-one the player is in (weather, sound loops, foes). Each also runs alone:
+deactivate -> unload`: geometry in the project's materials, lights, foes, breakables, navigation
+baked on a thread when streamed and settled onto the floor; everything built lives under one
+`Content` node. The forest builds each zone as the player nears it and frees it when far behind
+(see docs/performance.md), and tracks which one the player is in (weather, sound loops, foes). Each also runs alone:
 `scenes/zones/crossing.tscn`, `scenes/zones/belfry.tscn`.
 
 ### Flooded Crossing (about 95 m)
@@ -124,16 +125,14 @@ after the layout.
 
 ## Checks
 
-`tests/zones.gd` (41 checks): fire liveliness, phase and drift; wind reaching and leaving the
+`tests/zones.gd` (45 checks): fire liveliness, phase and drift; wind reaching and leaving the
 crowns; breakables (one count per swing, two light swings for a barrel, fragments limited and
 gone, reset, a wall blocks the blow, the grate stays open); composition groups, unique ids,
 nothing near landings or the bonfire; both zones walkable on their navigation from entry to
 exit (the crossing also through the ford, the belfry also by the gallery); drowning and rising;
 the bell; walking on from the clearing into both zones and the belfry checkpoint; the portal's
-readiness, lock and unlock. Measured streaming the forest with both zones from the ruins
-(headless): most frames stay under about 15 ms, but one frame of about 50 ms right as the forest
-finishes and one of about 25 ms shortly before remain. They are there with or without the detail
-pass and are not tracked down yet.
+readiness, lock and unlock; zones built on approach, freed when far behind and built again on
+return. Frame times are covered in docs/performance.md.
 
 Not done yet: F4 build/emitter counters, a debug view of anchors and no-prop zones, the new
 arch's effect (it stays a landmark until it has a destination), a dedicated music cue per zone

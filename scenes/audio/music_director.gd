@@ -69,6 +69,16 @@ func _exit_tree() -> void:
 	_players.clear()
 
 
+## Starts reading an area's score from disk on worker threads, so play_area finds it loaded.
+func preload_area(next: StringName) -> void:
+	if not AREAS.has(next):
+		return
+	for kind in ["explore", "combat"]:
+		for path: String in AREAS[next][kind]:
+			if ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+				ResourceLoader.load_threaded_request(path)
+
+
 func play_area(next: StringName, crossfade: float = 3.0) -> void:
 	if not AREAS.has(next):
 		return
@@ -135,10 +145,17 @@ func stop_all() -> void:
 
 
 ## Positional crackle on every lantern light under root (names starting with "Lamp").
-func attach_torches(root: Node) -> void:
+## Paced: a few voices per frame, so a big streamed area does not start forty players at once.
+func attach_torches(root: Node, paced: bool = false) -> void:
+	var started := 0
 	for light in root.find_children("*", "OmniLight3D", true, false):
-		if light.has_node("Crackle") or not (light.name.begins_with("Lamp") or light.name.begins_with("WatchFire")):
+		if not is_instance_valid(light) or light.has_node("Crackle") or not (light.name.begins_with("Lamp") or light.name.begins_with("WatchFire")):
 			continue
+		started += 1
+		if paced and started % 4 == 0:
+			await get_tree().process_frame
+			if not is_instance_valid(light):
+				continue
 		var crackle := AudioStreamPlayer3D.new()
 		crackle.name = "Crackle"
 		crackle.stream = _looping(TORCH)

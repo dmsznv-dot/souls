@@ -136,6 +136,11 @@ func _test_ruins(world: Node3D) -> void:
 	_check(world.ruins_outcome == &"defeat" and not hero.can_fight, "a fall in the ruins ends the attempt")
 	_key(KEY_T)
 	await _ticks(6)
+	# The new ruins stream in over a few frames (foes two a frame, then dressing and navigation).
+	var settle := 0
+	while not world.ruins.is_set_up and settle < 120:
+		await process_frame
+		settle += 1
 	_check(world.scene_file_path == BOSS_SCENE and world.outcome == &"victory",
 		"retry keeps the world and the Gatekeeper's defeat")
 	_check(world.ruins != old_area and world.ruins.remaining == 8

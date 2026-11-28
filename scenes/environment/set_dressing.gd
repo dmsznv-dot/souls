@@ -27,13 +27,20 @@ var _fires := 0
 var STONE: StandardMaterial3D = _mat("ruin_stone", Color(0.34, 0.35, 0.32), 0.92)
 
 
-static func dress(root: Node3D, layout: Array, seed_base: int = 7) -> Node3D:
+## With a tree it is spread over frames (await it): about 3 ms of building per frame.
+static func dress(root: Node3D, layout: Array, seed_base: int = 7, tree: SceneTree = null) -> Node3D:
 	var builder := new()
 	var holder := Node3D.new()
 	holder.name = "SetDressing"
 	root.add_child(holder)
 	builder._root = holder
+	var slice := Time.get_ticks_usec()
 	for i in layout.size():
+		if tree != null and Time.get_ticks_usec() - slice > 3000:
+			await tree.process_frame
+			slice = Time.get_ticks_usec()
+			if not is_instance_valid(holder) or not holder.is_inside_tree():
+				return null
 		var entry: Dictionary = layout[i]
 		builder._rng.seed = int(entry.get("seed", seed_base * 1000 + i))
 		var prop := Node3D.new()
@@ -86,8 +93,9 @@ static func _relative(node: Node3D, ancestor: Node3D) -> Transform3D:
 
 ## Rebuilds a region's navigation mesh from the static colliders under source, so foes path
 ## around the dressing. Bounds are in source space; floor_height is the walkable floor's height
-## above the bottom of the bounds.
-static func rebake_navigation(region: NavigationRegion3D, source: Node3D, bounds: AABB, floor_height: float = 1.0) -> void:
+## above the bottom of the bounds. With a tree the bake runs on a worker thread (await it).
+static func rebake_navigation(region: NavigationRegion3D, source: Node3D, bounds: AABB, floor_height: float = 1.0,
+		tree: SceneTree = null) -> void:
 	var mesh := NavigationMesh.new()
 	mesh.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
 	mesh.geometry_collision_mask = 1
@@ -100,7 +108,14 @@ static func rebake_navigation(region: NavigationRegion3D, source: Node3D, bounds
 	mesh.filter_baking_aabb = bounds
 	var data := NavigationMeshSourceGeometryData3D.new()
 	NavigationServer3D.parse_source_geometry_data(mesh, data, source)
-	NavigationServer3D.bake_from_source_geometry_data(mesh, data)
+	if tree != null:
+		NavigationServer3D.bake_from_source_geometry_data_async(mesh, data)
+		while NavigationServer3D.is_baking_navigation_mesh(mesh):
+			await tree.process_frame
+		if not is_instance_valid(region) or not region.is_inside_tree():
+			return
+	else:
+		NavigationServer3D.bake_from_source_geometry_data(mesh, data)
 	if mesh.get_polygon_count() == 0:
 		return
 	# Recast places a flat floor a cell or two above the stone; agents compare waypoints in 3D,

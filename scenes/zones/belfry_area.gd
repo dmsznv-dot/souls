@@ -13,7 +13,6 @@ const FLOOR_Y := -4.0
 const HALL_Y := -1.0
 const BELL := Vector3(0.0, 3.2, -44.0)
 const EXIT := Vector3(0.0, 2.0, -58.0)
-const Detail = preload("res://scenes/zones/zone_detail.gd")
 ## Pillars in the chamber (holding up the roots) and sarcophagi in the bell hall: [at, yaw].
 const PILLARS := [Vector3(-4.0, FLOOR_Y, -22.5), Vector3(4.0, FLOOR_Y, -22.5)]
 const SARCOPHAGI := [[Vector3(-6.4, HALL_Y, -42.3), 0.0], [Vector3(-6.4, HALL_Y, -45.2), 0.0], [Vector3(6.4, HALL_Y, -46.6), 0.0]]
@@ -42,12 +41,14 @@ func _init() -> void:
 func _layout() -> void:
 	var rock := stone()
 	var root_color := material("root", Color(0.22, 0.17, 0.13))
+	await pace()
 	# The gorge: a level mouth between rock faces, roots arching overhead.
 	box(Vector3(0, -0.5, -3.0), Vector3(7.0, 1.0, 6.0), rock)
 	for side in [-1.0, 1.0]:
 		box(Vector3(side * 3.2, 2.5, -3.0), Vector3(1.0, 6.0, 6.0), rock)
 	for k in 3:
 		_root(Vector3(-3.0, 4.2 - k * 0.3, -1.0 - k * 2.0), Vector3(3.0, 4.6 - k * 0.2, -1.6 - k * 2.0), 0.22, root_color)
+	await pace()
 	# The crypt arch, then a tunnel that tilts down to the chamber.
 	for side in [-1.0, 1.0]:
 		box(Vector3(side * 1.9, 1.6, -6.2), Vector3(0.6, 3.2, 0.6), rock)
@@ -63,21 +64,27 @@ func _layout() -> void:
 		view.rotation.x = -tilt
 	box(Vector3(-2.0, -1.0, -12.0), Vector3(0.4, 9.0, 12.6), null)
 	box(Vector3(2.0, -1.0, -12.0), Vector3(0.4, 9.0, 12.6), null)
+	await pace()
 	# The lower chamber.
 	box(Vector3(0, FLOOR_Y - 0.5, -25.5), Vector3(17.0, 1.0, 15.0), rock)
 	box(Vector3(0, FLOOR_Y + 7.3, -25.5), Vector3(17.0, 0.6, 15.0), rock)
 	box(Vector3(8.6, FLOOR_Y + 3.5, -25.5), Vector3(0.6, 7.0, 15.0), rock)
+	await pace()
 	# West wall in pieces around the niche's two openings (z -21 grate, z -29 open).
 	box(Vector3(-8.6, FLOOR_Y + 3.5, -18.9), Vector3(0.6, 7.0, 1.8), rock)
 	box(Vector3(-8.6, FLOOR_Y + 3.5, -25.0), Vector3(0.6, 7.0, 6.4), rock)
 	box(Vector3(-8.6, FLOOR_Y + 3.5, -31.6), Vector3(0.6, 7.0, 2.8), rock)
 	box(Vector3(-8.6, FLOOR_Y + 5.0, -21.0), Vector3(0.6, 4.0, 1.6), rock)
 	box(Vector3(-8.6, FLOOR_Y + 5.0, -29.0), Vector3(0.6, 4.0, 1.6), rock)
+	await pace()
 	# Back wall of the chamber beside the stairs, front wall around the crypt mouth.
+	await pace()
 	# Back wall: left of the stairs and between the stairs and the gallery.
 	box(Vector3(-5.4, FLOOR_Y + 3.5, -33.1), Vector3(6.2, 7.0, 0.6), rock)
 	box(Vector3(3.9, FLOOR_Y + 3.5, -33.1), Vector3(3.2, 7.0, 0.6), rock)
+	await pace()
 	# The well between the chamber and the hall: a floor below, walls and a roof around the
+	await pace()
 	# stairs and the gallery so nothing opens onto the void.
 	box(Vector3(3.15, FLOOR_Y - 0.5, -36.4), Vector3(10.9, 1.0, 6.6), rock)
 	box(Vector3(-2.45, FLOOR_Y + 4.5, -36.4), Vector3(0.3, 9.0, 6.6), rock)
@@ -87,16 +94,20 @@ func _layout() -> void:
 	box(Vector3(5.3, FLOOR_Y + 3.5, -17.9), Vector3(6.6, 7.0, 0.6), rock)
 	box(Vector3(0, 1.45, -17.9), Vector3(4.0, 3.7, 0.6), rock)
 	_niche(rock)
+	await pace()
+	await pace()
 	# The gallery: up the east wall from the chamber floor to the bell hall's level.
 	ramp(Vector3(6.6, FLOOR_Y, -19.5), Vector3(6.6, HALL_Y, -29.5), 2.0, 0.6, rock)
 	box(Vector3(6.6, HALL_Y - 0.3, -35.5), Vector3(2.0, 0.6, 12.0), rock)
 	box(Vector3(5.45, HALL_Y + 0.3, -33.0), Vector3(0.25, 0.6, 7.0), rock)
+	await pace()
 	# The ritual arch at the foot of the stairs, violet and dormant.
 	for side in [-1.0, 1.0]:
 		box(Vector3(side * 2.3, FLOOR_Y + 1.8, -32.6), Vector3(0.5, 3.6, 0.5), rock)
 	box(Vector3(0, FLOOR_Y + 3.8, -32.6), Vector3(5.1, 0.5, 0.6), rock)
 	cold_light(Vector3(0, FLOOR_Y + 2.6, -32.0), 1.4, 4.0, Color(0.55, 0.42, 1.0))
 	stairs(Vector3(0, FLOOR_Y, -33.4), Vector3(0, 0, -1), 5.0, HALL_Y - FLOOR_Y, 4.0, 12, rock)
+	await pace()
 	# The bell hall, a shaft open to the sky over the bell.
 	box(Vector3(0, HALL_Y - 0.5, -44.6), Vector3(16.0, 1.0, 13.2), rock)
 	box(Vector3(-8.0, HALL_Y + 4.0, -45.0), Vector3(0.6, 9.0, 11.0), rock)
@@ -112,8 +123,11 @@ func _layout() -> void:
 	for k in 3:
 		_root(Vector3(-7.5, 7.0 - k * 0.4, -42.0 - k * 2.0), Vector3(7.5, 7.4 - k * 0.3, -43.0 - k * 1.5), 0.3, root_color)
 	_make_bell()
+	await pace()
+	await pace()
 	# Moonlight down the shaft: a cold wash on the bell so its silhouette reads from the stairs.
 	cold_light(BELL + Vector3(0.6, 2.5, 1.5), 2.2, 9.0, Color(0.5, 0.64, 0.95))
+	await pace()
 	# Stairs to the exit, a landing under the open sky, a lantern at the door.
 	stairs(Vector3(0, HALL_Y, -51.1), Vector3(0, 0, -1), 5.0, EXIT.y - HALL_Y, 3.6, 10, rock)
 	box(Vector3(0, EXIT.y - 0.5, -59.0), Vector3(5.0, 1.0, 5.6), rock)
@@ -122,10 +136,12 @@ func _layout() -> void:
 		box(Vector3(side * 2.4, EXIT.y + 2.0, -59.0), Vector3(0.4, 4.0, 5.6), rock)
 	box(Vector3(0, EXIT.y + 2.0, -61.8), Vector3(5.0, 4.0, 0.4), null)
 	lamp(Vector3(1.8, EXIT.y + 2.1, -56.9), 6.0, 6.0, Color(1.0, 0.58, 0.25), &"lantern")
+	await pace()
 	# One fire in the chamber; cold glints at the roots; draughts in the openings.
 	dress(Vector3(-4.0, FLOOR_Y, -27.0), [{"kind": "campfire", "at": Vector3.ZERO, "lit": true, "camp": false}], 53)
 	cold_light(Vector3(6.5, FLOOR_Y + 5.5, -20.0), 1.1, 6.0, Color(0.45, 0.62, 0.7))
 	cold_light(Vector3(-6.0, HALL_Y + 6.0, -48.0), 1.0, 7.0, Color(0.45, 0.6, 0.75))
+	await pace()
 	# Two different spills of debris and a pair of crates in the chamber's corner.
 	dress(Vector3(4.5, FLOOR_Y, -31.0), [{"kind": "rubble", "at": Vector3.ZERO, "radius": 1.0, "count": 9, "collide": false}], 61)
 	dress(Vector3(-5.0, HALL_Y, -48.5), [{"kind": "bones", "at": Vector3.ZERO, "radius": 1.0, "count": 9, "skulls": 2},
@@ -141,6 +157,16 @@ func _layout() -> void:
 
 
 # ---------------------------------------------------------------- detail
+
+func _warmup_samples(holder: Node3D) -> void:
+	holder.add_child(Detail.dust(Vector3.ZERO, Vector3.ONE, 2))
+	holder.add_child(Detail.light_shaft(Vector3(0, 1, 0), Vector3.ZERO, 0.3, 0.5, Color(0.5, 0.6, 0.85, 0.14)))
+	holder.add_child(Props.flames(0.55, 4, 0.07))
+	var bell := MeshInstance3D.new()
+	bell.mesh = BoxMesh.new()
+	bell.material_override = Props.vertex_material(0.35)
+	holder.add_child(bell)
+
 
 ## Rock that stops reading as boxes, roots through it, the crypt's ribs and the hall's masonry,
 ## pillars, sarcophagi, candles, chains, the bell's beam and the shaft of moonlight. Built in
@@ -289,8 +315,9 @@ func _detail_nodes() -> void:
 		var inward := -0.1 if flame.z > -30.0 else 0.1
 		lamp(flame + Vector3(0, 0.15, inward), 4.5 if flame.z > -30.0 else 4.0, 6.5, Color(1.0, 0.55, 0.22), &"torch", "Sconce")
 		var fire := Props.flames(0.55, 12, 0.07)
-		add_child(fire)
+		_content.add_child(fire)
 		fire.position = flame
+		await pace()
 	# Moonlight down the shaft and dust turning in it and in the chamber.
 	var shaft := Detail.light_shaft(Vector3(0, HALL_Y + 8.6, -45.0), Vector3(0.3, HALL_Y + 0.05, -44.6), 1.7, 2.6, Color(0.5, 0.6, 0.85, 0.14))
 	_visual.add_child(shaft)
@@ -317,7 +344,7 @@ func _niche(rock: Material) -> void:
 	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	glow.vertex_color_use_as_albedo = true
 	caps.material_override = glow
-	add_child(caps)
+	_content.add_child(caps)
 	caps.position = Vector3(-12.2, FLOOR_Y, -27.0)
 
 
@@ -331,14 +358,14 @@ func _root(from: Vector3, to: Vector3, radius: float, mat: Material) -> void:
 	var view := MeshInstance3D.new()
 	view.mesh = mesh
 	view.material_override = mat
-	add_child(view)
+	_content.add_child(view)
 	view.transform = Transform3D(Basis.looking_at(run.normalized(), Vector3.UP) * Basis(Vector3.RIGHT, PI * 0.5), (from + to) * 0.5)
 
 
 func _make_bell() -> void:
 	_bell = Node3D.new()
 	_bell.name = "Bell"
-	add_child(_bell)
+	_content.add_child(_bell)
 	_bell.position = BELL + Vector3(0, 2.0, 0)
 	var tool := SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -364,7 +391,7 @@ func _make_bell() -> void:
 	_echo_voice.bus = &"SFX"
 	_echo_voice.unit_size = 10.0
 	_echo_voice.max_distance = 40.0
-	add_child(_echo_voice)
+	_content.add_child(_echo_voice)
 	_echo_voice.position = Vector3(0, FLOOR_Y + 2.0, -25.0)
 
 
@@ -373,7 +400,7 @@ func ring() -> void:
 	rings += 1
 	_bell_rest = 9.0
 	_bell_swing = 1.0
-	if _bell_voice != null:
+	if is_instance_valid(_bell_voice):
 		_bell_voice.play()
 	get_tree().create_timer(0.7, false).timeout.connect(func() -> void:
 		if is_instance_valid(_echo_voice):
@@ -381,7 +408,7 @@ func ring() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if _bell == null:
+	if not is_instance_valid(_bell):
 		return
 	_bell_swing = maxf(0.0, _bell_swing - delta * 0.25)
 	_bell.rotation.x = sin(Time.get_ticks_msec() * 0.003) * 0.12 * _bell_swing

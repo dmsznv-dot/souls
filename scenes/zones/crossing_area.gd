@@ -15,7 +15,6 @@ const DROWN_Y := -4.1
 ## Shallow ford: rectangles (x0, z0, x1, z1) where the floor is just under the surface.
 const FORD := [Rect2(-11.0, -62.0, 3.5, 13.0), Rect2(-10.0, -75.0, 3.0, 13.5)]
 const EXIT := Vector3(0.0, 1.0, -98.0)
-const Detail = preload("res://scenes/zones/zone_detail.gd")
 const WALKS := [[-22.0, -40.0], [-58.0, -74.0]]
 const HUT := Vector3(5.0, DECK_Y, -52.5)
 const STELE := Vector3(-2.3, EXIT.y, -93.0)
@@ -40,16 +39,20 @@ func _init() -> void:
 
 func _layout() -> void:
 	var mud := material("mud", Color(0.2, 0.17, 0.13), 0.6)
+	await pace()
 	# The slope down from the clearing, walled by trunks and an invisible rail of thicket.
 	ramp(Vector3(0, 0, 0), Vector3(0, DECK_Y, -14), 5.0, 2.0, mud)
 	for side: float in [-1.0, 1.0]:
 		box(Vector3(side * 3.4, -1.0, -7.0), Vector3(0.4, 6.0, 15.0), null)
 		for k in 4:
 			_tree(Vector3(side * (3.6 + k % 2), -1.0 - k * 0.6, -2.0 - k * 3.4), k + int(side * 3.0))
+			await pace()
+	await pace()
 	# Banks and islet: collision here, their surfaces come from the detail pass.
 	box(Vector3(0, DECK_Y - 0.6, -18.5), Vector3(26, 1.2, 9), null)
 	box(Vector3(0.5, DECK_Y - 0.6, -49.0), Vector3(17, 1.2, 18), null)
 	box(Vector3(0, DECK_Y - 0.6, -80.0), Vector3(26, 1.2, 12), null)
+	await pace()
 	# The water and the deep bed under it.
 	var water := MeshInstance3D.new()
 	water.name = "Water"
@@ -59,30 +62,38 @@ func _layout() -> void:
 	var surface := ShaderMaterial.new()
 	surface.shader = preload("res://scenes/zones/water.gdshader")
 	water.material_override = surface
-	add_child(water)
+	_content.add_child(water)
 	water.position = Vector3(0, WATER_Y, -50)
 	box(Vector3(0, -7.0, -50), Vector3(60, 1.0, 76), null)
+	await pace()
 	# The shallow ford: a floor a hand under the surface.
 	for rect: Rect2 in FORD:
 		# Top a hand under the surface and within a step of the banks, so it can be walked.
 		box(Vector3(rect.position.x + rect.size.x * 0.5, WATER_Y - 0.35, rect.position.y + rect.size.y * 0.5),
 				Vector3(rect.size.x, 0.5, rect.size.y), mud)
+	await pace()
 	# Plank walks on piles: the deck's collision here, planks and piles in the detail pass.
 	for walk: Array in WALKS:
 		var length: float = walk[0] - walk[1]
 		box(Vector3(0, DECK_Y - 0.1, (walk[0] + walk[1]) * 0.5), Vector3(2.4, 0.2, length), null)
 	_hut(HUT)
+	await pace()
+	await pace()
 	# Far bank: stone steps up to the gorge, a landing at the top.
 	stairs(Vector3(0, DECK_Y, -84.5), Vector3(0, 0, -1), 8.0, EXIT.y - DECK_Y, 4.0, 14, stone())
 	box(Vector3(0, EXIT.y - 0.5, -95.0), Vector3(6, 1.0, 6.5), stone())
 	for side: float in [-1.0, 1.0]:
 		box(Vector3(side * 2.6, 0.0, -88.5), Vector3(0.6, 3.5, 8.0), stone())
 		_tree(Vector3(side * 7.0, DECK_Y, -79.0), 11 + int(side))
+		await pace()
 		_tree(Vector3(side * 10.0, DECK_Y, -20.0), 13 + int(side))
+		await pace()
+	await pace()
 	# Bounds: thicket along both sides and behind the banks.
 	box(Vector3(-16.0, -1.0, -50), Vector3(1.0, 12.0, 100), null)
 	box(Vector3(16.0, -1.0, -50), Vector3(1.0, 12.0, 100), null)
 	box(Vector3(0, -1.0, -99.5), Vector3(32, 12.0, 1.0), null)
+	await pace()
 	# Two crates by the hut, kept off the fighting ground.
 	breakable(&"crate", "hut/crate_0", Vector3(7.2, DECK_Y, -48.5), 0.3)
 	breakable(&"crate", "hut/crate_1", Vector3(6.9, DECK_Y, -56.0), -0.4)
@@ -96,7 +107,7 @@ func _tree(at: Vector3, seed: int) -> void:
 	var tree := MeshInstance3D.new()
 	tree.mesh = Props.fir(seed + 100) if seed % 3 != 0 else Props.snag(seed + 100)
 	tree.material_override = Props.vertex_material()
-	add_child(tree)
+	_content.add_child(tree)
 	tree.position = at - Vector3(0, 0.2, 0)
 	tree.rotation.y = seed * 1.3
 	var trunk := CollisionShape3D.new()
@@ -128,14 +139,14 @@ func _hut(at: Vector3) -> void:
 	glow.albedo_color = Color(1.0, 0.66, 0.3)
 	window.material_override = glow
 	window.name = "Glass"
-	add_child(window)
+	_content.add_child(window)
 	window.position = at + Vector3(0, 1.5, 1.66)
 	lamp(at + Vector3(0, 1.4, 0), 5.0, 5.5, Color(1.0, 0.58, 0.26), &"lantern")
 	# The swinging lantern by the end of the first walk.
 	var pole_at := Vector3(1.9, DECK_Y, -41.5)
 	_lantern_pivot = Node3D.new()
 	_lantern_pivot.name = "LanternPivot"
-	add_child(_lantern_pivot)
+	_content.add_child(_lantern_pivot)
 	_lantern_pivot.position = pole_at + Vector3(-0.7, 2.5, 0)
 	var cage := MeshInstance3D.new()
 	var cage_mesh := BoxMesh.new()
@@ -164,6 +175,19 @@ func _hut(at: Vector3) -> void:
 
 # ---------------------------------------------------------------- detail
 
+func _warmup_samples(holder: Node3D) -> void:
+	var water := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(1, 1)
+	water.mesh = plane
+	var surface := ShaderMaterial.new()
+	surface.shader = preload("res://scenes/zones/water.gdshader")
+	water.material_override = surface
+	holder.add_child(water)
+	holder.add_child(Detail.mist(Vector3.ZERO, Vector3.ONE, 2))
+	holder.add_child(Detail.fireflies(Vector3.ZERO, Vector3.ONE, 2))
+
+
 ## Lights, solid pieces and air for the detail pass (main thread, cheap).
 func _detail_nodes() -> void:
 	for side: float in [-1.0, 1.0]:
@@ -181,6 +205,7 @@ func _detail_nodes() -> void:
 		_visual.add_child(snag)
 		snag.position = spec[0]
 		snag.rotation = Vector3(spec[1], 0.0, 0.12)
+		await pace()
 	# Mist low over the water and fireflies over the ford.
 	ambient(Detail.mist(Vector3(0, WATER_Y + 0.6, -50.0), Vector3(14.0, 0.3, 24.0), 26))
 	ambient(Detail.fireflies(Vector3(-8.5, WATER_Y + 1.1, -61.0), Vector3(3.0, 0.7, 12.0), 22))
@@ -405,7 +430,7 @@ func _floating_log(d: Detail, at: Vector3, yaw: float) -> void:
 
 func _physics_process(delta: float) -> void:
 	_clock += delta
-	if _lantern_pivot != null:
+	if is_instance_valid(_lantern_pivot):
 		var weather := get_node_or_null(^"/root/Weather")
 		var push: float = (weather.wind * 0.12 + weather.gust * 0.25) if weather != null else 0.1
 		_lantern_pivot.rotation = Vector3(sin(_clock * 1.9) * push, 0, sin(_clock * 1.3 + 0.7) * push * 0.6)

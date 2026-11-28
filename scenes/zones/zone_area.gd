@@ -17,6 +17,8 @@ const SetDressing = preload("res://scenes/environment/set_dressing.gd")
 const Breakable = preload("res://scenes/environment/breakable_prop.gd")
 const Props = preload("res://scenes/forest/forest_props.gd")
 const NoirLighting = preload("res://scenes/fx/noir_lighting.gd")
+const Marks = preload("res://scenes/debug/perf_marks.gd")
+const Detail = preload("res://scenes/zones/zone_detail.gd")
 const ENEMY_SCENES := {
 	&"spearman": "res://scenes/expedition/enemies/spearman.tscn",
 	&"shieldbearer": "res://scenes/expedition/enemies/shieldbearer.tscn",
@@ -38,6 +40,13 @@ var props: Array = []
 var foes_spec: Array = []
 var entry_local := Vector3.ZERO
 var respawn_local := Vector3.ZERO
+## Everything prepare() builds lives under this node, so unload() frees it in one go and a later
+## prepare() builds it again.
+var _content: Node3D
+var _building := false
+## While streamed, pace() hands the frame back after about 2.5 ms of building.
+var _pacing := false
+var _slice_start := 0
 var _geometry: StaticBody3D
 var _visual: Node3D
 var _enemies: Node3D
@@ -50,42 +59,124 @@ var _materials := {}
 
 func prepare(hero: CharacterBody3D, streamed: bool) -> void:
 	player = hero
-	if prepared:
+	if prepared or _building:
 		return
+	_building = true
+	_content = Node3D.new()
+	_content.name = "Content"
+	add_child(_content)
 	_geometry = StaticBody3D.new()
 	_geometry.name = "Geometry"
 	_geometry.collision_layer = 1
 	_geometry.collision_mask = 0
-	add_child(_geometry)
+	_content.add_child(_geometry)
 	_visual = Node3D.new()
 	_visual.name = "Visual"
-	add_child(_visual)
+	_content.add_child(_visual)
 	_enemies = Node3D.new()
 	_enemies.name = "Enemies"
-	add_child(_enemies)
-	_layout()
+	_content.add_child(_enemies)
+	Marks.mark(self, StringName(zone_id + ":layout"))
+	_pacing = streamed
+	_slice_start = Time.get_ticks_usec()
+	await _layout()
+	if not is_inside_tree():
+		return
 	if streamed:
 		await get_tree().process_frame
-	_detail_nodes()
+		if not is_inside_tree():
+			return
+	Marks.mark(self, StringName(zone_id + ":detail_nodes"))
+	_slice_start = Time.get_ticks_usec()
+	await _detail_nodes()
+	if not is_inside_tree():
+		return
 	await _build_detail(streamed)
+	if not is_inside_tree():
+		return
 	if streamed:
 		await get_tree().process_frame
+		if not is_inside_tree():
+			return
 		await get_tree().process_frame
+		if not is_inside_tree():
+			return
 	_navigation = NavigationRegion3D.new()
 	_navigation.name = "Navigation"
-	add_child(_navigation)
+	_content.add_child(_navigation)
 	await _bake_navigation(streamed)
+	if not is_inside_tree():
+		return
 	if streamed:
 		await get_tree().process_frame
+		if not is_inside_tree():
+			return
 	await reset_foes(streamed)
+	if not is_inside_tree():
+		return
+	Marks.mark(self, StringName(zone_id + ":toon"))
 	NoirLighting.toon(self)
 	for flicker in find_children("Flicker", "Node", true, false):
 		flicker.set_base_energy((flicker.get_parent() as Light3D).light_energy)
 	prepared = true
+	_building = false
+	_pacing = false
 	deactivate()
 
 
+## Frees everything prepare() built: geometry, lights, foes, props, sounds, navigation. The zone
+## keeps its place, bounds and transforms, so it still answers contains() and respawn
+## transforms, and prepare() builds it again when the player comes back.
+func unload() -> void:
+	if not prepared or _building:
+		return
+	deactivate()
+	prepared = false
+	active = false
+	props.clear()
+	_loops.clear()
+	_ambient.clear()
+	_materials.clear()
+	remove_meta(&"navigation_ready")
+	if is_instance_valid(_content):
+		_content.queue_free()
+	_content = null
+	_geometry = null
+	_visual = null
+	_enemies = null
+	_navigation = null
+
+
 func _layout() -> void:
+	pass
+
+
+## Call between pieces of _layout() and _detail_nodes() (await it): while the zone streams in,
+## it waits for the next frame once this frame's share of building is spent.
+func pace() -> void:
+	if _pacing and Time.get_ticks_usec() - _slice_start > 2500:
+		await get_tree().process_frame
+		_slice_start = Time.get_ticks_usec()
+
+
+## Small stand-ins for everything this zone draws, built without building the zone, for the
+## shader warm-up at the portal (the zone itself is built later, on approach). Keep the
+## returned node alive: a shader is freed with the last material that uses it.
+func warmup_samples() -> Node3D:
+	var holder := Node3D.new()
+	holder.name = "%sSamples" % zone_id
+	var d: Detail = Detail.new(1)
+	d.block(d.opaque, Vector3.ZERO, Vector3.ONE * 0.2, Color.GRAY)
+	d.block(d.foliage, Vector3.ZERO, Vector3.ONE * 0.2, Color.GRAY)
+	d.block(d.glow, Vector3.ZERO, Vector3.ONE * 0.2, Color.WHITE)
+	d.attach(holder, "Detail")
+	_warmup_samples(holder)
+	NoirLighting.toon(holder)
+	return holder
+
+
+## Subclasses add what only they draw (water, particles, shafts of light).
+func _warmup_samples(_holder: Node3D) -> void:
 	pass
 
 
@@ -121,6 +212,7 @@ func _build_detail(streamed: bool) -> void:
 	for region: Array in regions:
 		if not is_inside_tree():
 			return
+		Marks.mark(self, StringName(zone_id + ":attach"))
 		region[0].attach(_visual, region[1])
 		if streamed:
 			await get_tree().process_frame
@@ -172,13 +264,18 @@ func engaged() -> bool:
 
 ## Brings foes back to their posts and puts broken crates and barrels together again.
 func reset_foes(paced: bool = false) -> void:
+	if paced and not is_inside_tree():
+		return
 	for prop in props:
 		if is_instance_valid(prop):
 			prop.reset()
+	if _enemies == null:
+		return
 	for foe in enemies():
 		foe.queue_free()
 		_enemies.remove_child(foe)
 	for spec: Array in foes_spec:
+		Marks.mark(self, StringName("foe:" + String(spec[0])))
 		var foe: CharacterBody3D = load(ENEMY_SCENES[spec[0]]).instantiate()
 		foe.player = player
 		foe.ai_enabled = active
@@ -194,6 +291,8 @@ func reset_foes(paced: bool = false) -> void:
 		if paced:
 			# A body with its rig takes several milliseconds: one per frame while streaming.
 			await get_tree().process_frame
+			if not is_inside_tree() or _enemies == null:
+				return
 
 
 # ---------------------------------------------------------------- building blocks
@@ -283,12 +382,12 @@ func stairs(from: Vector3, direction: Vector3, run: float, rise: float, width: f
 
 func lamp(at: Vector3, energy: float, reach: float, color: Color, profile: StringName, name_prefix: String = "Lamp") -> OmniLight3D:
 	var light := OmniLight3D.new()
-	light.name = "%s%d" % [name_prefix, get_child_count()]
+	light.name = "%s%d" % [name_prefix, _content.get_child_count()]
 	light.light_color = color
 	light.light_energy = energy
 	light.omni_range = reach
 	light.omni_attenuation = 1.2
-	add_child(light)
+	_content.add_child(light)
 	light.position = at
 	if profile != &"":
 		var fire := preload("res://scenes/fx/fire_light.gd").new()
@@ -300,11 +399,11 @@ func lamp(at: Vector3, energy: float, reach: float, color: Color, profile: Strin
 
 func cold_light(at: Vector3, energy: float, reach: float, color: Color) -> OmniLight3D:
 	var light := OmniLight3D.new()
-	light.name = "Cold%d" % get_child_count()
+	light.name = "Cold%d" % _content.get_child_count()
 	light.light_color = color
 	light.light_energy = energy
 	light.omni_range = reach
-	add_child(light)
+	_content.add_child(light)
 	light.position = at
 	return light
 
@@ -314,7 +413,7 @@ func breakable(kind: StringName, id: String, at: Vector3, yaw: float) -> Node3D:
 	prop.kind = kind
 	prop.prop_id = "%s/%s" % [zone_id, id]
 	prop.name = id.replace("/", "_")
-	add_child(prop)
+	_content.add_child(prop)
 	prop.position = at
 	prop.rotation.y = yaw
 	props.append(prop)
@@ -331,21 +430,21 @@ func loop_sound(path: String, at: Vector3, volume_db: float, unit_size: float = 
 	voice.unit_size = unit_size
 	voice.max_distance = 40.0
 	voice.volume_db = volume_db
-	add_child(voice)
+	_content.add_child(voice)
 	voice.position = at
 	_loops.append(voice)
 	return voice
 
 
 func ambient(air: CPUParticles3D) -> CPUParticles3D:
-	add_child(air)
+	_content.add_child(air)
 	_ambient.append(air)
 	return air
 
 
 func dress(at: Vector3, entries: Array, seed: int) -> void:
 	var holder := Node3D.new()
-	add_child(holder)
+	_content.add_child(holder)
 	holder.position = at
 	SetDressing.dress(holder, entries, seed)
 
@@ -377,11 +476,19 @@ func _bake_navigation(streamed: bool = false) -> void:
 	await get_tree().physics_frame
 	if not is_inside_tree():
 		return
-	var space := get_world_3d().direct_space_state
+	Marks.mark(self, StringName(zone_id + ":navigation_settle"))
 	var vertices := mesh.vertices
 	var hanging := PackedByteArray()
 	hanging.resize(vertices.size())
+	var slice := Time.get_ticks_usec()
 	for i in vertices.size():
+		if streamed and i % 64 == 0 and Time.get_ticks_usec() - slice > 2500:
+			# One ray per vertex: spread over frames while the player is about.
+			await get_tree().physics_frame
+			if not is_inside_tree():
+				return
+			slice = Time.get_ticks_usec()
+		var space := get_world_3d().direct_space_state
 		var top := to_global(vertices[i] + Vector3(0, 0.3, 0))
 		var ray := PhysicsRayQueryParameters3D.create(top, top + Vector3(0, -2.5, 0), 1)
 		var hit := space.intersect_ray(ray)

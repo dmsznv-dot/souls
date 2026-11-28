@@ -176,7 +176,7 @@ func _test_crossing() -> void:
 	await scene_changed
 	var area := current_scene.get_node("Area")
 	await _ticks(20)
-	var nav: NavigationRegion3D = area.get_node("Navigation")
+	var nav: NavigationRegion3D = area.get_node("Content/Navigation")
 	var path := NavigationServer3D.map_get_path(nav.get_navigation_map(), area.to_global(area.entry_local), area.to_global(area.EXIT + Vector3(0, 0, 1.5)), true)
 	_check(path.size() > 2 and path[-1].distance_to(area.to_global(area.EXIT + Vector3(0, 0, 1.5))) < 1.0, "the crossing can be walked from the slope to the stone steps")
 	var ford := NavigationServer3D.map_get_path(nav.get_navigation_map(), area.to_global(Vector3(-7.0, -3.0, -50.0)), area.to_global(Vector3(-8.5, -3.0, -78.0)), true)
@@ -200,13 +200,13 @@ func _test_belfry() -> void:
 	await scene_changed
 	var area := current_scene.get_node("Area")
 	await _ticks(20)
-	var nav: NavigationRegion3D = area.get_node("Navigation")
+	var nav: NavigationRegion3D = area.get_node("Content/Navigation")
 	var map := nav.get_navigation_map()
 	var path := NavigationServer3D.map_get_path(map, area.to_global(area.entry_local), area.to_global(area.EXIT + Vector3(0, 0, -1)), true)
 	_check(path.size() > 2 and path[-1].distance_to(area.to_global(area.EXIT + Vector3(0, 0, -1))) < 1.0, "the belfry leads from the gorge down, through the arch and up to the exit")
 	var gallery := NavigationServer3D.map_get_path(map, area.to_global(Vector3(6.6, -4, -20)), area.to_global(Vector3(6.6, -1, -40)), true)
 	_check(gallery.size() > 2 and gallery[-1].distance_to(area.to_global(Vector3(6.6, -1, -40))) < 1.0, "the gallery climbs to the bell hall")
-	var grate: Node3D = area.get_node("niche_grate")
+	var grate: Node3D = area.get_node("Content/niche_grate")
 	_check(grate != null and not grate.is_broken, "a rotten grate closes the niche")
 	var weather := root.get_node("Weather")
 	weather.gust = 1.0
@@ -232,14 +232,37 @@ func _test_walk_on() -> void:
 	var space := hero.get_world_3d().direct_space_state
 	var ray := PhysicsRayQueryParameters3D.create(gap_center + Vector3(0, 1.0, 3.0), gap_center + Vector3(0, 1.0, -3.0), 1)
 	_check(space.intersect_ray(ray).is_empty(), "the clearing's south edge is open")
+	# Zones are built as the player nears them and freed when far behind.
+	_check(not area.crossing.prepared and not area.belfry.prepared, "the zones beyond wait unbuilt while the player is far")
+	var clearing: Vector3 = area.to_global(area.world.point(area.world.CLEARING.x, area.world.CLEARING.z)) + Vector3(0, 0.3, 0)
+	hero.global_position = clearing
+	await _until(func() -> bool: return area.crossing.prepared)
+	_check(area.crossing.prepared, "the crossing is built as the player nears it")
 	hero.global_position = area.crossing.to_global(area.crossing.entry_local) + Vector3(0, 0.2, 0)
 	await _ticks(20)
 	_check(area.zone == &"crossing" and area.crossing.active, "walking south enters the Flooded Crossing")
 	_check(hero.is_on_floor(), "on solid ground where the forest ends")
+	await _until(func() -> bool: return area.belfry.prepared)
+	hero.global_position = area.entrance_transform().origin + Vector3(0, 0.3, 0)
+	await _until(func() -> bool: return not area.crossing.prepared and not area.belfry.prepared)
+	_check(not area.crossing.prepared and not area.belfry.prepared and area.crossing.get_child_count() == 0,
+		"walking back to the forest's edge frees both zones")
+	hero.global_position = clearing
+	await _until(func() -> bool: return area.crossing.prepared)
+	hero.global_position = area.crossing.to_global(area.crossing.entry_local) + Vector3(0, 0.2, 0)
+	await _until(func() -> bool: return area.belfry.prepared)
+	_check(area.crossing.prepared and area.belfry.prepared, "and coming back builds them again")
 	hero.global_position = area.belfry.to_global(area.belfry.entry_local) + Vector3(0, 0.2, 0)
 	await _ticks(5)
 	_check(area.zone == &"belfry" and area.checkpoint == &"belfry", "the belfry's mouth becomes the place to rise")
 	_check(area.respawn_transform().origin.distance_to(area.belfry.respawn_transform().origin) < 0.01, "and the hero would rise there")
+
+
+func _until(done: Callable, limit: int = 900) -> void:
+	var waited := 0
+	while not done.call() and waited < limit:
+		await physics_frame
+		waited += 1
 
 
 func _test_portal_contract() -> void:

@@ -7,6 +7,7 @@ extends "res://scenes/duel/courtyard_duel.gd"
 const RUINS_AREA := "res://scenes/expedition/outer_ruins_area.tscn"
 const FOREST_AREA := "res://scenes/forest/forest_area.tscn"
 const ForestArea = preload("res://scenes/forest/forest_area.gd")
+const ShaderWarmup = preload("res://scenes/fx/shader_warmup.gd")
 ## The Thornwood lies far from the court; only the eclipse ring leads there.
 const FOREST_OFFSET := Vector3(600.0, 0.0, 0.0)
 const OuterRuins = preload("res://scenes/expedition/outer_ruins.gd")
@@ -24,6 +25,8 @@ var _transitioning: bool
 var ruins_outcome: StringName
 var _ruins_scene: PackedScene
 var _ruins_announced: bool
+## Stand-ins from the shader warm-up, kept so their shaders are not freed before use.
+var _warm_keep: Array[Node3D] = []
 
 @onready var _gate: Node3D = $AshGate
 @onready var _court_hills: Node3D = $Environment/Court/AshHills
@@ -34,6 +37,36 @@ var _ruins_announced: bool
 func _ready() -> void:
 	super()
 	ResourceLoader.load_threaded_request(RUINS_AREA, "PackedScene")
+	_warm_ruins.call_deferred()
+
+
+## Part of the level's load: the ruins are read now and their shaders compiled out of sight, so
+## the gate opening onto them does not stall on a first run (a new machine, driver or build).
+func _warm_ruins() -> void:
+	if OS.get_cmdline_user_args().has("--no-warmup"):
+		return
+	if _ruins_scene == null:
+		_ruins_scene = ResourceLoader.load_threaded_get(RUINS_AREA) as PackedScene
+	if _ruins_scene == null:
+		return
+	var sample := _ruins_scene.instantiate()
+	var items := ShaderWarmup.gather(sample)
+	var foes := {}
+	for foe in sample.get_node("Enemies").get_children():
+		if not foe.scene_file_path.is_empty():
+			foes[foe.scene_file_path] = true
+	var stand_ins := []
+	for path: String in foes:
+		stand_ins.append(load(path))
+	await ShaderWarmup.run(self, items, ShaderWarmup.spots(self, $Player.global_position), 3, stand_ins)
+	sample.free()
+
+
+func _exit_tree() -> void:
+	for samples in _warm_keep:
+		if is_instance_valid(samples):
+			samples.free()
+	_warm_keep.clear()
 
 
 func _process(delta: float) -> void:
@@ -75,8 +108,13 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func open_gate() -> void:
 	_gate_prompt.hide()
+	# What the far side will need, read from disk on worker threads while the player fights on.
+	Music.preload_area(&"forest")
+	for path: String in ForestArea.foe_scenes():
+		ResourceLoader.load_threaded_request(path)
 	_spawn_ruins()
-	_start_forest()
+	# The forest starts streaming a frame later, after the gate's own frame.
+	_start_forest.call_deferred()
 	_gate.open()
 	_audio.play_cue(&"gate_open", _gate_prompt.global_position)
 	$Player/CameraRig.add_trauma(0.45)
@@ -111,27 +149,51 @@ func _finish(result: StringName) -> void:
 	super(result)
 
 
+## The ruins behind the gate. Their foes join one per frame and the rest of the setup is spread
+## over frames too, so opening the gate or rising in the ruins does not stall a frame.
 func _spawn_ruins() -> void:
 	if ruins != null:
 		ruins.queue_free()
 		ruins.name = "FallenRuins"
 	if _ruins_scene == null:
 		_ruins_scene = ResourceLoader.load_threaded_get(RUINS_AREA) as PackedScene
-	ruins = _ruins_scene.instantiate()
-	ruins.name = "OuterRuinsArea"
-	add_child(ruins)
-	ruins.position = RUINS_OFFSET
-	ruins.reset_physics_interpolation()
-	ruins.setup($Player, true)
-	ruins.set_backdrop_visible(zone == &"ruins")
-	for enemy in ruins.enemies():
+	var area: Node3D = _ruins_scene.instantiate()
+	ruins = area
+	area.name = "OuterRuinsArea"
+	var held: Array[Node] = []
+	var roster := area.get_node("Enemies")
+	for enemy in roster.get_children():
+		enemy.owner = null
+		roster.remove_child(enemy)
+		held.append(enemy)
+	add_child(area)
+	area.position = RUINS_OFFSET
+	area.reset_physics_interpolation()
+	# One foe a frame: each one's rig takes a few milliseconds to set up.
+	for i in held.size():
+		await get_tree().process_frame
+		if not is_instance_valid(area) or not area.is_inside_tree():
+			for left in held:
+				if is_instance_valid(left) and not left.is_inside_tree():
+					left.free()
+			return
+		var enemy: Node = held[i]
+		enemy.set(&"player", $Player)
+		roster.add_child(enemy)
+		enemy.owner = area
+	area.setup($Player, true)
+	area.portal.destination_ready = _forest_entry_ready
+	area.set_backdrop_visible(zone == &"ruins")
+	for enemy in area.enemies():
 		enemy.get_node("Combat").feedback.connect(_on_feedback)
-	ruins.cleared.connect(_ruins_finish.bind(&"victory"))
-	ruins.portal_entered.connect(_enter_forest)
-	ruins.portal.destination_ready = _forest_entry_ready
-	ruins.enemy_defeated.connect(func(_enemy: Node) -> void: _show_notice("%d LEFT" % ruins.remaining, 1.2))
-	Music.attach_torches(ruins)
+	area.cleared.connect(_ruins_finish.bind(&"victory"))
+	area.portal_entered.connect(_enter_forest)
+	area.enemy_defeated.connect(func(_enemy: Node) -> void: _show_notice("%d LEFT" % area.remaining, 1.2))
 	Weather.bind_area(self)
+	if not area.is_set_up:
+		await area.set_up
+	if is_instance_valid(area) and area.is_inside_tree():
+		await Music.attach_torches(area, true)
 
 
 func _track_zone() -> void:
@@ -206,8 +268,9 @@ func _start_forest() -> void:
 	forest.zone_changed.connect(func(_zone: StringName, title: String) -> void: _show_notice(title, 2.2))
 	forest.ambushed.connect(func(at: Vector3) -> void: _audio.play_cue(&"ambush", at, 1.0))
 	await forest.setup($Player, true)
+	get_node(^"/root/Perf").mark(&"forest:torches")
 	forest.set_active(zone == &"forest")
-	Music.attach_torches(forest)
+	await Music.attach_torches(forest, true)
 
 
 func _open_eclipse() -> void:
@@ -242,9 +305,13 @@ func _arrive_in_forest() -> void:
 		$Player.can_fight = _hero.health > 0.0
 		return
 	zone = &"forest"
+	get_node(^"/root/Perf").mark(&"portal:arrive")
 	forest.set_active(true)
 	_place_player(forest.entrance_transform())
 	$Player.can_fight = true
+	# The veil is opaque for a moment: the rest of the hand-over is spread over its frames.
+	await get_tree().process_frame
+	get_node(^"/root/Perf").mark(&"portal:environment")
 	for holder in find_children("*", "WorldEnvironment", true, false):
 		if not forest.is_ancestor_of(holder):
 			(holder as WorldEnvironment).environment = ForestArea.environment()
@@ -253,9 +320,34 @@ func _arrive_in_forest() -> void:
 	if ruins != null:
 		ruins.set_backdrop_visible(false)
 	_court_hills.visible = false
+	await get_tree().process_frame
+	get_node(^"/root/Perf").mark(&"portal:music")
 	Music.play_area(&"forest", 2.5)
+	await get_tree().process_frame
+	get_node(^"/root/Perf").mark(&"portal:weather")
 	Weather.set_preset(&"forest")
 	Weather.bind_area(forest)
+	# The way back is closed: the ruins and their foes are freed while the veil still covers it.
+	if ruins != null:
+		ruins.queue_free()
+		ruins = null
+	# Still under the veil: compile the forest's and the zones' shaders now rather than as each
+	# thing first comes into view.
+	await get_tree().process_frame
+	if not OS.get_cmdline_user_args().has("--no-warmup"):
+		get_node(^"/root/Perf").mark(&"portal:warmup")
+		var items := ShaderWarmup.gather(forest)
+		# The zones are built later, on approach: warm their kinds of material now too, and keep
+		# the stand-ins so those shaders stay compiled until the zones use them.
+		_warm_keep.clear()
+		for area: Node3D in [forest.crossing, forest.belfry]:
+			var samples: Node3D = area.warmup_samples()
+			_warm_keep.append(samples)
+			items.append_array(ShaderWarmup.gather(samples))
+		var stand_ins := []
+		for path: String in ForestArea.foe_scenes():
+			stand_ins.append(load(path))
+		await ShaderWarmup.run(forest, items, ShaderWarmup.spots(forest, forest.entrance_transform().origin), 3, stand_ins)
 	# The portal's hum fades out by the standing stones.
 	_audio.play_cue(&"portal_open", forest.entrance_transform().origin + Vector3(0, 1.5, 2.0), 0.3)
 	_show_notice("THE THORNWOOD", 2.6)
