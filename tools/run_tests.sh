@@ -4,7 +4,7 @@
 # Usage: tools/run_tests.sh [path-to-godot]
 GODOT="${1:-godot}"
 status=0
-for suite in stage_one duel expedition weapons foes music ai weather poise dressing forest movement; do
+for suite in stage_one duel expedition weapons foes music ai weather poise dressing forest movement zones; do
 	log=$("$GODOT" --headless --path . --script "res://tests/$suite.gd" 2>&1)
 	code=$?
 	echo "$log" | grep -E "checks passed|FAIL"

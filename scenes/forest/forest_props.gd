@@ -245,6 +245,7 @@ static func lantern(index: int) -> Node3D:
 	post.material_override = vertex_material()
 	root.add_child(post)
 	var glass := MeshInstance3D.new()
+	glass.name = "Glass"
 	var box := BoxMesh.new()
 	box.size = Vector3(0.15, 0.24, 0.15)
 	glass.mesh = box
@@ -362,6 +363,20 @@ static func bonfire() -> Node3D:
 	sparks.emitting = false
 	fire.add_child(sparks)
 	sparks.position = Vector3(0, 0.4, 0)
+	var embers := MeshInstance3D.new()
+	embers.name = "Embers"
+	var bed := CylinderMesh.new()
+	bed.top_radius = 0.42
+	bed.bottom_radius = 0.5
+	bed.height = 0.05
+	bed.radial_segments = 7
+	embers.mesh = bed
+	var ember_glow := StandardMaterial3D.new()
+	ember_glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ember_glow.albedo_color = Color(1.0, 0.36, 0.1)
+	embers.material_override = ember_glow
+	fire.add_child(embers)
+	embers.position = Vector3(0, 0.07, 0)
 	var smoulder := flames(1.2, 6, 0.06, 0.3)
 	smoulder.name = "Smoulder"
 	fire.add_child(smoulder)

@@ -504,6 +504,16 @@ func guarding() -> bool:
 	return blocking and action == &"" and guard_raise >= BLOCK_STARTUP
 
 
+## Deep water, a long drop: no blow, no reaction, just the end.
+func fall_to_death() -> void:
+	if action == &"dead":
+		return
+	health = 0.0
+	_set_action(&"dead", 1.4)
+	_emit(&"death", 0.6)
+	defeated.emit()
+
+
 func interrupt_for_parry() -> void:
 	_set_action(&"stagger", PARRY_STAGGER)
 	_parried = true
@@ -652,6 +662,8 @@ func _strike() -> void:
 	var origin := body.global_position + Vector3.UP
 	var space := body.get_world_3d().direct_space_state
 	_swing_volume.radius = maxf(origin.distance_to(current[1]), origin.distance_to(previous[1])) + 1.0
+	if opponent_mask == 4:
+		_strike_props(previous, current, origin, definition)
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = _swing_volume
 	query.transform = Transform3D(Basis.IDENTITY, origin)
@@ -708,6 +720,45 @@ func _position_bonus(other: Node3D) -> Vector2:
 	if facing < 0.35:
 		return FLANK_BONUS
 	return Vector2.ONE
+
+
+## The hero's blade also breaks props (crates, barrels, rotten grates) on the Breakable layer:
+## the same sweep, one count per swing, nothing through a wall.
+func _strike_props(previous: PackedVector3Array, current: PackedVector3Array, origin: Vector3, definition: AttackData) -> void:
+	var space := body.get_world_3d().direct_space_state
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = _swing_volume
+	query.transform = Transform3D(Basis.IDENTITY, origin)
+	query.collision_mask = 8
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	for contact in space.intersect_shape(query, 8):
+		var area := contact.collider as Area3D
+		if area == null or not area.has_meta(&"breakable"):
+			continue
+		var prop: Node3D = area.get_meta(&"breakable")
+		if not is_instance_valid(prop) or prop.is_broken:
+			continue
+		var holder := area.get_child(0) as CollisionShape3D
+		var box := holder.shape as BoxShape3D
+		var center := holder.global_position
+		var axis := Vector3.UP * box.size.y * 0.5
+		var radius := maxf(box.size.x, box.size.z) * 0.5
+		var point := Vector3.INF
+		for step in range(1, BLADE_SUBSTEPS + 1):
+			var t := float(step) / BLADE_SUBSTEPS
+			var closest := Geometry3D.get_closest_points_between_segments(previous[0].lerp(current[0], t), previous[1].lerp(current[1], t), center - axis, center + axis)
+			if closest[0].distance_to(closest[1]) <= radius + (weapon.blade_half_width if weapon else 0.04):
+				point = closest[0]
+				break
+		if point == Vector3.INF:
+			continue
+		var sight := PhysicsRayQueryParameters3D.create(origin, point, 1, [prop.get_node(^"Solid").get_rid()])
+		if not space.intersect_ray(sight).is_empty():
+			continue
+		var heavy := definition == heavy_attack or definition.impact >= 0.6
+		# The prop plays its own crack and throws its own splinters.
+		prop.receive_hit(self, action_serial, heavy)
 
 
 func _is_behind(other: Node3D) -> bool:

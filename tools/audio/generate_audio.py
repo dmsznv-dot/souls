@@ -791,6 +791,70 @@ def forest_audio() -> None:
     write("sfx/bonfire", normalize(fade(reverb(kindle, 2.2, 0.35, 4000), 0.01, 0.8), -3))
 
 
+def thornwood_sfx() -> None:
+    """Breaking wood and the drip of a wet canopy."""
+    local = np.random.default_rng(31337)
+    length = int(0.9 * SR)
+    crack = np.zeros(length)
+    for k in range(5):
+        snap_len = int(local.uniform(0.02, 0.05) * SR)
+        snap = bp(noise(snap_len), 700, 4200) * exp_decay(snap_len, local.uniform(0.006, 0.015))
+        place(crack, snap, local.uniform(0.0, 0.12), local.uniform(0.5, 1.0))
+    place(crack, thump(0.35, 140, 60, 0.07), 0.0, 0.7)
+    for k in range(7):
+        clatter_len = int(0.06 * SR)
+        knock = np.sin(2 * np.pi * local.uniform(300, 700) * t_axis(0.06)) * exp_decay(clatter_len, 0.012)
+        place(crack, knock, 0.18 + local.uniform(0, 0.55), local.uniform(0.15, 0.4))
+    write("sfx/wood_break", normalize(fade(crack), -3))
+    seconds = 12.0
+    length = int(seconds * SR)
+    drips = np.zeros((length, 2))
+    for k in range(70):
+        drop_len = int(0.05 * SR)
+        f = local.uniform(900, 2200)
+        drop = np.sin(2 * np.pi * np.cumsum(np.linspace(f, f * 1.6, drop_len)) / SR) * exp_decay(drop_len, 0.01)
+        pos = int(local.uniform(0, seconds - 0.1) * SR)
+        pan = local.uniform(0.1, 0.9)
+        gain = local.uniform(0.2, 0.7)
+        drips[pos:pos + drop_len, 0] += drop * (1 - pan) * gain
+        drips[pos:pos + drop_len, 1] += drop * pan * gain
+    hiss = bp(noise(length), 2000, 7000) * 0.015
+    drips[:, 0] += hiss
+    drips[:, 1] += np.roll(hiss, 977)
+    write("ambience/drips", rms_normalize(drips, -30), True)
+
+
+def zones_audio() -> None:
+    """Water lapping under the crossing's walks; the belfry's bell and its answer below."""
+    local = np.random.default_rng(424242)
+    seconds = 14.0
+    length = int(seconds * SR)
+    water = np.zeros((length, 2))
+    body = lp(noise(length), 420) * (0.5 + 0.5 * np.sin(2 * np.pi * t_axis(seconds) * 0.35))
+    water[:, 0] += body * 0.6
+    water[:, 1] += np.roll(body, 1301) * 0.6
+    for k in range(60):
+        lap_len = int(local.uniform(0.15, 0.4) * SR)
+        lap = bp(noise(lap_len), local.uniform(250, 500), local.uniform(900, 1600)) * env_adsr(lap_len, 0.05, 0.2, 0.3, 0.4)
+        pos = int(local.uniform(0, seconds - 0.5) * SR)
+        pan = local.uniform(0.1, 0.9)
+        water[pos:pos + lap_len, 0] += lap * (1 - pan) * 0.5
+        water[pos:pos + lap_len, 1] += lap * pan * 0.5
+    write("ambience/water", rms_normalize(water, -28), True)
+    # The bell: a low bronze strike with long inharmonic partials.
+    seconds = 6.0
+    length = int(seconds * SR)
+    t = t_axis(seconds)
+    f0 = midi(n("D2"))
+    bell = np.zeros(length)
+    for ratio, amp, decay in [(0.5, 0.5, 3.5), (1.0, 1.0, 2.8), (1.19, 0.6, 2.2), (1.5, 0.45, 1.8), (2.0, 0.5, 1.5), (2.52, 0.3, 1.1), (3.0, 0.25, 0.8), (4.07, 0.15, 0.5)]:
+        bell += np.sin(2 * np.pi * f0 * ratio * t + local.uniform(0, 6)) * amp * exp_decay(length, decay)
+    bell[: int(0.01 * SR)] += noise(int(0.01 * SR)) * 0.6
+    write("sfx/bell_toll", normalize(fade(reverb(bell, 3.0, 0.4, 3000), 0.002, 1.0), -2))
+    echo = lp(bell, 500) * 0.5
+    write("sfx/bell_echo", normalize(fade(reverb(echo, 3.5, 0.7, 1200), 0.05, 1.5), -9))
+
+
 # ---------------------------------------------------------------- music
 
 def court_music() -> None:
@@ -980,3 +1044,5 @@ if __name__ == "__main__":
     weather_audio()
     impact_sfx()
     forest_audio()
+    thornwood_sfx()
+    zones_audio()

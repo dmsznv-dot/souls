@@ -26,6 +26,8 @@ func _test_forest() -> void:
 	await scene_changed
 	var area := current_scene.get_node("Area")
 	var hero := current_scene.get_node("Player") as CharacterBody3D
+	while not area.built:
+		await physics_frame
 	_check(area.built and area.world.road.size() > 200, "the road winds over two hundred metres (%d m)" % area.world.road.size())
 	_check(area.world.trunks.size() > 1500, "the forest is dense (%d trunks and rocks)" % area.world.trunks.size())
 	var lamps := area.find_children("Lamp*", "OmniLight3D", true, false)
@@ -58,11 +60,19 @@ func _test_ambush_and_bonfire() -> void:
 	await scene_changed
 	var area := current_scene.get_node("Area")
 	var hero := current_scene.get_node("Player") as CharacterBody3D
+	while not area.built:
+		await physics_frame
 	var first: Array = area._ambush_state[0][1]
 	_check(not first[0].visible and not first[0].is_in_group(&"foes"), "foes wait hidden in the trees")
 	var trigger: float = area.AMBUSHES[0][0]
 	var spot: Vector3 = area.world.road[int(trigger) + 1]
 	hero.global_position = area.to_global(spot) + Vector3.UP * 0.2
+	await _ticks(3)
+	_check(not area._ambush_state[0][0] or area.combat_ready(), "ambushes wait until foes can find their way")
+	var waited := 0
+	while not area.combat_ready() and waited < 600:
+		await physics_frame
+		waited += 1
 	await _ticks(3)
 	_check(area._ambush_state[0][0], "walking the road springs the ambush")
 	await _ticks(90)

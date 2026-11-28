@@ -24,7 +24,7 @@ var _focus: ProgressBar
 
 func _ready() -> void:
 	_area.foe_spawned.connect(_on_foe_spawned)
-	_area.setup($Player, false)
+	await _area.setup($Player, false)
 	_place_player(_area.entrance_transform())
 	Music.play_area(&"forest", 2.0)
 	Weather.set_preset(&"forest")
@@ -37,6 +37,7 @@ func _ready() -> void:
 	FoeBars.install($Interface)
 	_hero.weapon_changed.connect(func(weapon: SoulsWeapon) -> void: _set_notice(HudUtil.weapon_notice(weapon), 2.0))
 	_area.rested.connect(_on_rested)
+	_area.zone_changed.connect(func(_zone: StringName, title: String) -> void: _set_notice(title, 2.2))
 	_area.ambushed.connect(func(at: Vector3) -> void: _audio.play_cue(&"ambush", at, 1.0))
 	_set_notice("THE THORNWOOD", 2.4)
 
@@ -49,6 +50,8 @@ func _place_player(at: Transform3D) -> void:
 	var player := $Player as CharacterBody3D
 	player.global_transform = at
 	player.velocity = Vector3.ZERO
+	player.drive = Vector3.ZERO
+	player.commands.clear()
 	player.reset_physics_interpolation()
 	player.get_node("Heading").rotation.y = 0.0
 	var camera := player.get_node("CameraRig")
@@ -62,7 +65,7 @@ func _process(delta: float) -> void:
 	_vitality.value = _hero.health
 	_stamina.value = _hero.stamina
 	_focus.value = _hero.focus
-	_group_status.text = "THE THORNWOOD" + ("   /   BONFIRE LIT" if _area.bonfire_lit else "")
+	_group_status.text = _area.zone_title() + ("   /   BONFIRE LIT" if _area.bonfire_lit else "")
 	_notice_time = maxf(0.0, _notice_time - delta)
 	_notice.visible = _notice_time > 0.0
 	%OpponentName.visible = false

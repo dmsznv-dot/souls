@@ -20,6 +20,7 @@ var zone: StringName = &"court"
 var ruins: Node3D
 var forest: ForestArea
 var _forest_fallen: bool
+var _transitioning: bool
 var ruins_outcome: StringName
 var _ruins_scene: PackedScene
 var _ruins_announced: bool
@@ -41,7 +42,7 @@ func _process(delta: float) -> void:
 	if zone == &"ruins" and ruins != null:
 		_show_ruins_hud()
 	elif zone == &"forest":
-		_hero_caption.text = "THE THORNWOOD" + ("   /   BONFIRE LIT" if forest.bonfire_lit else "")
+		_hero_caption.text = forest.zone_title() + ("   /   BONFIRE LIT" if forest.bonfire_lit else "")
 		$Interface/GuardMeters.visible = false
 
 
@@ -127,6 +128,7 @@ func _spawn_ruins() -> void:
 		enemy.get_node("Combat").feedback.connect(_on_feedback)
 	ruins.cleared.connect(_ruins_finish.bind(&"victory"))
 	ruins.portal_entered.connect(_enter_forest)
+	ruins.portal.destination_ready = _forest_entry_ready
 	ruins.enemy_defeated.connect(func(_enemy: Node) -> void: _show_notice("%d LEFT" % ruins.remaining, 1.2))
 	Music.attach_torches(ruins)
 	Weather.bind_area(self)
@@ -201,6 +203,7 @@ func _start_forest() -> void:
 	forest.reset_physics_interpolation()
 	forest.foe_spawned.connect(func(foe: CharacterBody3D) -> void: foe.get_node("Combat").feedback.connect(_on_feedback))
 	forest.rested.connect(_on_forest_rested)
+	forest.zone_changed.connect(func(_zone: StringName, title: String) -> void: _show_notice(title, 2.2))
 	forest.ambushed.connect(func(at: Vector3) -> void: _audio.play_cue(&"ambush", at, 1.0))
 	await forest.setup($Player, true)
 	forest.set_active(zone == &"forest")
@@ -215,16 +218,29 @@ func _open_eclipse() -> void:
 	_show_notice("The eclipse ring stirs", 2.6)
 
 
+## Ready to receive the player: ground, collision and the spawn exist (navigation may still be
+## baking; the forest keeps its ambushes asleep until it is).
+func _forest_entry_ready() -> bool:
+	return forest != null and forest.entry_ready()
+
+
 func _enter_forest() -> void:
-	if forest == null or not forest.built:
-		_show_notice("The eclipse has not yet settled", 1.6)
+	if _transitioning or not _forest_entry_ready():
+		ruins.portal.unlock()
 		return
+	_transitioning = true
 	_audio.play_cue(&"portal_enter", $Player.global_position)
 	$Player.can_fight = false
 	RetroFX.pass_through(Color(0.08, 0.05, 0.16), _arrive_in_forest)
 
 
 func _arrive_in_forest() -> void:
+	_transitioning = false
+	if _hero.health <= 0.0 or not _forest_entry_ready():
+		# The crossing could not finish: stay, hand control back, let the portal take a press.
+		ruins.portal.unlock()
+		$Player.can_fight = _hero.health > 0.0
+		return
 	zone = &"forest"
 	forest.set_active(true)
 	_place_player(forest.entrance_transform())
@@ -240,6 +256,8 @@ func _arrive_in_forest() -> void:
 	Music.play_area(&"forest", 2.5)
 	Weather.set_preset(&"forest")
 	Weather.bind_area(forest)
+	# The portal's hum fades out by the standing stones.
+	_audio.play_cue(&"portal_open", forest.entrance_transform().origin + Vector3(0, 1.5, 2.0), 0.3)
 	_show_notice("THE THORNWOOD", 2.6)
 
 
@@ -247,6 +265,8 @@ func _place_player(at: Transform3D) -> void:
 	var player := $Player as CharacterBody3D
 	player.global_transform = at
 	player.velocity = Vector3.ZERO
+	player.drive = Vector3.ZERO
+	player.commands.clear()
 	player.reset_physics_interpolation()
 	player.get_node("Heading").rotation.y = 0.0
 	var camera := player.get_node("CameraRig")

@@ -11,8 +11,14 @@ const PRESETS := {
 	&"clear": {"wind": 0.25, "gusts": 0.4, "rain": 0.0, "storm": 0.0, "debris": 0.4},
 	&"court": {"wind": 0.45, "gusts": 0.8, "rain": 0.25, "storm": 0.0, "debris": 1.0},
 	&"ruins": {"wind": 0.65, "gusts": 1.0, "rain": 0.85, "storm": 1.0, "debris": 0.8},
-	# Under the canopy: a dry, still night, leaves drifting down, the odd gust in the crowns.
-	&"forest": {"wind": 0.3, "gusts": 0.55, "rain": 0.0, "storm": 0.0, "debris": 1.0},
+	# Under the canopy: the storm left behind, leaves drifting down, gusts in the crowns. Rain
+	# eases out in a few seconds; drizzle comes back in the open (local_rain). Stone and mud
+	# dry over about ten seconds and gloss less than the ruins' flagstones.
+	&"forest": {"wind": 0.3, "gusts": 0.55, "rain": 0.0, "storm": 0.0, "debris": 1.0, "ease": 0.25, "dry": 0.1, "gloss": 0.35},
+	# The crossing: open water, a steady drizzle.
+	&"crossing": {"wind": 0.4, "gusts": 0.6, "rain": 0.3, "storm": 0.0, "debris": 0.5, "ease": 0.15, "dry": 0.05, "gloss": 0.6},
+	# Under the roots: rain only at the mouth, draughts in the openings.
+	&"belfry": {"wind": 0.2, "gusts": 0.5, "rain": 0.0, "storm": 0.0, "debris": 0.2, "ease": 0.2, "dry": 0.05, "gloss": 0.5},
 }
 const RAIN_LOOP := "res://assets/audio/ambience/rain.ogg"
 const THUNDER := ["res://assets/audio/ambience/thunder_0.ogg", "res://assets/audio/ambience/thunder_1.ogg"]
@@ -28,6 +34,14 @@ var rain: float
 ## 0..1 wetness of surfaces; lags the rain.
 var wet: float
 var enabled: bool = true
+## Rain an area adds where the player stands (an open glade, a mouth of a cave), 0..1.
+var local_rain: float
+## Diagnostics (F7): 0 = as authored, 1 = no wind, 2 = a held strong gust.
+var wind_override: int
+var _ground_y := 0.0
+var _ground_timer := 0.0
+var _wind_xz := Vector2.ZERO
+var _sent_wind := Vector3(INF, 0, 0)
 
 var _target: Dictionary = PRESETS[&"clear"]
 var _base_wind: float = 0.25
@@ -81,6 +95,11 @@ func set_preset(name: StringName) -> void:
 	_rain_phase = randf() * TAU
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F7:
+		wind_override = (wind_override + 1) % 3
+
+
 ## Area controllers hand over the moon and the materials that get glossy in the rain.
 func bind_area(root: Node) -> void:
 	_wet_materials.clear()
@@ -95,10 +114,16 @@ func bind_area(root: Node) -> void:
 		if mesh_instance.mesh == null:
 			continue
 		for surface in mesh_instance.mesh.get_surface_count():
-			var material := mesh_instance.mesh.surface_get_material(surface) as BaseMaterial3D
-			if material != null and not _wet_materials.has(material) and material.shading_mode != BaseMaterial3D.SHADING_MODE_UNSHADED:
-				_wet_materials.append(material)
-				_dry_roughness.append(material.roughness)
+			_register_wet(mesh_instance.mesh.surface_get_material(surface) as BaseMaterial3D)
+	# Override materials too: generated ground and growth carry theirs on the instance.
+	for node in root.find_children("*", "GeometryInstance3D", true, false):
+		_register_wet((node as GeometryInstance3D).material_override as BaseMaterial3D)
+
+
+func _register_wet(material: BaseMaterial3D) -> void:
+	if material != null and not _wet_materials.has(material) and material.shading_mode != BaseMaterial3D.SHADING_MODE_UNSHADED:
+		_wet_materials.append(material)
+		_dry_roughness.append(material.roughness)
 
 
 func _process(delta: float) -> void:
@@ -117,9 +142,13 @@ func _process(delta: float) -> void:
 	_debris.global_position = center + Vector3(0, 1.0, 0) - wind_direction * 6.0
 	_ash.global_position = center + Vector3(0, 2.0, 0) - wind_direction * 6.0
 	_rain_drops.global_position = center + Vector3(0, 8.0, 0) - wind_direction * wind * 3.0
-	var ground := camera.global_position
-	ground.y = 0.06
-	_splashes.global_position = ground - camera.global_basis.z * 4.0
+	# Splashes sit on the real ground ahead of the camera, sampled ten times a second.
+	_ground_timer -= delta
+	var ahead := camera.global_position - camera.global_basis.z * 4.0
+	if _ground_timer <= 0.0:
+		_ground_timer = 0.1
+		_ground_y = _sample_ground(ahead)
+	_splashes.global_position = Vector3(ahead.x, _ground_y + 0.06, ahead.z)
 	var push := wind_direction * (2.0 + wind * 9.0)
 	_debris.gravity = Vector3(0, -1.2, 0) + push * 0.9
 	_ash.gravity = Vector3(0, -0.25, 0) + push * 0.6
@@ -138,6 +167,15 @@ func _process(delta: float) -> void:
 	_gust_player.volume_db = linear_to_db(maxf(gust * 0.85 + wind * 0.2, 0.0005)) - 3.0
 
 
+func _sample_ground(at: Vector3) -> float:
+	var world := get_viewport().world_3d
+	if world == null:
+		return _ground_y
+	var ray := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 6.0, at + Vector3.DOWN * 30.0, 1)
+	var hit := world.direct_space_state.intersect_ray(ray)
+	return hit.position.y if not hit.is_empty() else _ground_y
+
+
 func _update_wind(delta: float) -> void:
 	_base_wind = move_toward(_base_wind, _target["wind"], delta * 0.1)
 	_gust_timer -= delta
@@ -154,16 +192,32 @@ func _update_wind(delta: float) -> void:
 		envelope = sin(PI * _gust_age / _gust_length)
 	gust = envelope * float(_target["gusts"])
 	wind = clampf(_base_wind + gust * 0.6 + 0.05 * sin(Time.get_ticks_msec() * 0.0013), 0.0, 1.0)
+	if wind_override == 1:
+		gust = 0.0
+		wind = 0.0
+	elif wind_override == 2:
+		gust = 1.0
+		wind = 1.0
+	# Crowns follow the same wind, smoothed so a new direction rolls in rather than snaps.
+	var goal := Vector2(wind_direction.x, wind_direction.z) * wind
+	_wind_xz = _wind_xz.lerp(goal, 1.0 - exp(-2.0 * delta))
+	var sent := Vector3(_wind_xz.x, _wind_xz.y, gust)
+	if sent.distance_to(_sent_wind) > 0.004:
+		_sent_wind = sent
+		RenderingServer.global_shader_parameter_set(&"forest_wind_xz", _wind_xz)
+		RenderingServer.global_shader_parameter_set(&"forest_gust", gust)
 
 
 func _update_rain(delta: float) -> void:
 	# Showers come and go around the preset's level.
 	_rain_phase += delta * 0.03
 	var level := float(_target["rain"]) * clampf(0.55 + 0.6 * sin(_rain_phase), 0.0, 1.0)
-	rain = move_toward(rain, level, delta * 0.08)
-	wet = move_toward(wet, 1.0 if rain > 0.15 else 0.0, delta * (0.06 if rain > 0.15 else 0.02))
+	level = maxf(level, local_rain)
+	rain = move_toward(rain, level, delta * float(_target.get("ease", 0.08)))
+	wet = move_toward(wet, 1.0 if rain > 0.15 else 0.0, delta * (0.06 if rain > 0.15 else float(_target.get("dry", 0.02))))
+	var gloss := float(_target.get("gloss", 1.0))
 	for i in _wet_materials.size():
-		_wet_materials[i].roughness = lerpf(_dry_roughness[i], 0.28, wet * 0.85)
+		_wet_materials[i].roughness = lerpf(_dry_roughness[i], 0.28, wet * 0.85 * gloss)
 
 
 func _update_storm(delta: float) -> void:

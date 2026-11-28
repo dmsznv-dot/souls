@@ -13,8 +13,13 @@ signal rested
 signal enemy_defeated(enemy: CharacterBody3D)
 signal ambushed(at: Vector3)
 signal foe_spawned(foe: CharacterBody3D)
+## The player moved between the forest and the zones beyond it (crossing, belfry).
+signal zone_changed(zone: StringName, title: String)
 
 const World = preload("res://scenes/forest/forest_world.gd")
+const Compositions = preload("res://scenes/forest/thornwood_compositions.gd")
+const Crossing = preload("res://scenes/zones/crossing_area.gd")
+const Belfry = preload("res://scenes/zones/belfry_area.gd")
 const Props = preload("res://scenes/forest/forest_props.gd")
 const NoirLighting = preload("res://scenes/fx/noir_lighting.gd")
 const Combatant = preload("res://scenes/duel/combat/combatant.gd")
@@ -40,6 +45,16 @@ var world: World
 var bonfire_lit := false
 ## True once setup has finished building (a streamed forest takes a few seconds).
 var built := false
+var compositions
+## The zones that continue the forest on foot south of the clearing.
+var crossing: Crossing
+var belfry: Belfry
+## Where the player is: &"forest", &"crossing" or &"belfry".
+var zone: StringName = &"forest"
+## Where a fallen hero rises: the forest edge, the bonfire, or the belfry's mouth.
+var checkpoint: StringName = &"entrance"
+## Breakable props along the road (crates, barrels, the niche grate).
+var props: Array = []
 ## Ambushes and the bonfire only respond while the player is in the forest (a streamed forest
 ## is built ahead of time while the player is still in the ruins).
 var active := true
@@ -75,7 +90,11 @@ func setup(hero: CharacterBody3D, streamed: bool) -> void:
 	if not streamed:
 		_make_sky()
 	var accents := [to_global(Vector3(world.road_x(-30.0) - 9.0, 3.0, -30.0)), to_global(Vector3(world.road_x(-120.0) + 10.0, 3.5, -120.0))]
+	if streamed:
+		await get_tree().process_frame
 	NoirLighting.apply(self, accents)
+	if streamed:
+		await get_tree().process_frame
 	for light in find_children("*", "DirectionalLight3D", true, false):
 		tune_moon(light)
 	_tune_fires()
@@ -83,14 +102,22 @@ func setup(hero: CharacterBody3D, streamed: bool) -> void:
 
 func _build(tree: SceneTree) -> void:
 	world = World.new()
+	compositions = Compositions.new(world, AMBUSHES)
+	world.exclusions = compositions.exclusions()
 	var ground := Node3D.new()
 	ground.name = "Ground"
 	add_child(ground)
 	await world.build(ground, tree)
+	props = await compositions.build(self, tree)
+	_register_obstacles()
 	_place_lights()
+	if tree != null:
+		await tree.process_frame
 	_place_arrival()
+	await _build_zones(tree)
 	_bonfire = Props.bonfire()
 	add_child(_bonfire)
+	_attach_bonfire_fire()
 	_bonfire.position = world.point(World.CLEARING.x, World.CLEARING.z)
 	_prompt = Label3D.new()
 	_prompt.name = "RestPrompt"
@@ -111,6 +138,23 @@ func _build(tree: SceneTree) -> void:
 	_navigation.name = "Navigation"
 	add_child(_navigation)
 	await _bake_navigation(tree)
+
+
+## The crossing starts where the corridor leaves the clearing, level with it; the belfry where
+## the crossing's stone steps end.
+func _build_zones(tree: SceneTree) -> void:
+	crossing = Crossing.new()
+	crossing.name = "FloodedCrossing"
+	add_child(crossing)
+	crossing.position = world.point(World.CLEARING.x, World.MIN.y)
+	belfry = Belfry.new()
+	belfry.name = "BelfryUnderRoots"
+	add_child(belfry)
+	belfry.position = crossing.position + Crossing.EXIT
+	for area in [crossing, belfry]:
+		area.foe_spawned.connect(func(foe: CharacterBody3D) -> void: foe_spawned.emit(foe))
+		area.enemy_defeated.connect(func(foe: CharacterBody3D) -> void: enemy_defeated.emit(foe))
+		await area.prepare(player, tree != null)
 
 
 ## The moon of the Thornwood: high, cold and strong, so the canopy throws hard shadows and the
@@ -139,9 +183,8 @@ func _tune_fires() -> void:
 			lamp.light_energy = 8.0
 			lamp.omni_range = 7.5
 			lamp.omni_attenuation = 1.1
-	# The flicker scripts read their base energy when they enter the tree; reset it.
 	for flicker in find_children("Flicker", "Node", true, false):
-		flicker.set(&"_base", (flicker.get_parent() as Light3D).light_energy)
+		flicker.set_base_energy((flicker.get_parent() as Light3D).light_energy)
 
 
 static func environment() -> Environment:
@@ -184,12 +227,32 @@ func _make_sky() -> void:
 
 # ---------------------------------------------------------------- lights and landmarks
 
+## Authored solids join the navigation's obstacle list (the cart, the great oak, the niche,
+## props), so foes path around them; breaking a prop does not rebake.
+func _register_obstacles() -> void:
+	for body in get_node(^"Compositions").find_children("*", "StaticBody3D", true, false):
+		var holder := body.get_child(0) as CollisionShape3D if body.get_child_count() > 0 else null
+		if holder == null:
+			continue
+		var at := (body as Node3D).global_position - global_position
+		var size := Vector3.ONE * 0.6
+		if holder.shape is BoxShape3D:
+			size = (holder.shape as BoxShape3D).size
+		elif holder.shape is CylinderShape3D:
+			size = Vector3.ONE * (holder.shape as CylinderShape3D).radius * 2.0
+		world.trunks.append(Vector4(at.x, world.height(at.x, at.z), at.z, maxf(size.x, size.z) * 0.5))
+	for prop in props:
+		var at: Vector3 = prop.position
+		world.trunks.append(Vector4(at.x, world.height(at.x, at.z), at.z, 0.45))
+
+
 func _place_lights() -> void:
 	var lights := Node3D.new()
 	lights.name = "Lights"
 	add_child(lights)
 	var index := 0
-	var travelled := 6.0
+	# The first lantern stands ten metres past the arrival stones and shows where the road goes.
+	var travelled := 24.0
 	var side := 1.0
 	while travelled < world.road.size() - 18.0:
 		var at: Vector3 = world.road[int(travelled)]
@@ -254,9 +317,25 @@ func _place_arrival() -> void:
 	glow.position = Vector3(0, 1.6, 0.0)
 
 
+## Ground, collision, spawn: the player can be placed here.
+func entry_ready() -> bool:
+	return built
+
+
+## Navigation baked: foes can land and hunt. Ambushes wait for it.
+func combat_ready() -> bool:
+	return built and has_meta(&"navigation_ready")
+
+
 func set_active(on: bool) -> void:
 	active = on
 	visible = on
+	if not on:
+		for area in [crossing, belfry]:
+			if area != null and area.prepared:
+				area.deactivate()
+	if not on and get_node_or_null(^"/root/Weather") != null:
+		get_node(^"/root/Weather").local_rain = 0.0
 	if _night != null:
 		if on and not _night.playing:
 			_night.play()
@@ -275,7 +354,16 @@ func bonfire_transform() -> Transform3D:
 
 
 func respawn_transform() -> Transform3D:
+	if checkpoint == &"belfry" and belfry != null:
+		return belfry.respawn_transform()
 	return bonfire_transform() if bonfire_lit else entrance_transform()
+
+
+func zone_title() -> String:
+	match zone:
+		&"crossing": return crossing.title
+		&"belfry": return belfry.title
+	return "THE THORNWOOD"
 
 
 # ---------------------------------------------------------------- navigation
@@ -342,11 +430,20 @@ func enemies() -> Array[Node]:
 func engaged() -> bool:
 	if not built:
 		return false
+	for area in [crossing, belfry]:
+		if area != null and area.active and area.engaged():
+			return true
 	return enemies().any(func(enemy: Node) -> bool: return enemy.visible and enemy.is_engaged())
 
 
 ## Clears every foe and sets all ambushes again, each foe hidden in the trees.
 func reset_foes(paced: bool = false) -> void:
+	for area in [crossing, belfry]:
+		if area != null and area.prepared:
+			area.reset_foes()
+	for prop in props:
+		if is_instance_valid(prop):
+			prop.reset()
 	for foe in _enemies.get_children():
 		foe.queue_free()
 		_enemies.remove_child(foe)
@@ -425,11 +522,21 @@ func _hide(foe: CharacterBody3D, hidden: bool) -> void:
 func _physics_process(_delta: float) -> void:
 	if not built or player == null or not active:
 		return
+	_track_zone()
+	if zone != &"forest":
+		return
+	# Drizzle reaches the road in the open stretches; under the crowns it barely does.
+	var weather := get_node_or_null(^"/root/Weather")
+	if weather != null:
+		var here := to_local(player.global_position)
+		weather.local_rain = 0.16 if compositions.open_at(World.MAX.y - here.z) else 0.03
 	var local := to_local(player.global_position)
 	var progress := float(World.MAX.y - local.z)
 	if world.road_distance(local.x, local.z) > 14.0:
 		progress -= 6.0
 	for i in AMBUSHES.size():
+		if not combat_ready():
+			break
 		var state: Array = _ambush_state[i]
 		# Only near the spot: a player resting further on does not set off every ambush behind.
 		if state[0] or progress < AMBUSHES[i][0] or progress > AMBUSHES[i][0] + 25.0:
@@ -489,8 +596,35 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+func _track_zone() -> void:
+	var next: StringName = &"forest"
+	if belfry != null and belfry.contains(player.global_position):
+		next = &"belfry"
+	elif crossing != null and crossing.contains(player.global_position):
+		next = &"crossing"
+	if next == zone:
+		return
+	zone = next
+	for area in [crossing, belfry]:
+		if area == null or not area.prepared:
+			continue
+		if area == crossing and zone == &"crossing" or area == belfry and zone == &"belfry":
+			area.activate()
+		else:
+			area.deactivate()
+	var weather := get_node_or_null(^"/root/Weather")
+	if weather != null:
+		weather.local_rain = 0.0
+		weather.set_preset(&"forest" if zone == &"forest" else (crossing.weather_preset if zone == &"crossing" else belfry.weather_preset))
+	if zone == &"belfry":
+		# The safe side of the belfry's mouth becomes the place to rise.
+		checkpoint = &"belfry"
+	zone_changed.emit(zone, zone_title())
+
+
 ## Kindles the bonfire on first use; every rest brings the forest's foes back.
 func rest() -> void:
+	checkpoint = &"bonfire"
 	if not bonfire_lit:
 		bonfire_lit = true
 		kindle()
@@ -498,18 +632,24 @@ func rest() -> void:
 	rested.emit()
 
 
+## Embers, the big flames and the sparks share one ignition: the fire component multiplies
+## the light by it and lets the flames out once it has caught.
 func kindle() -> void:
-	var fire := _bonfire.get_node("Fire")
-	fire.get_node("HighFlames").emitting = true
-	fire.get_node("Sparks").emitting = true
-	var light := fire.get_node("BonfireLight") as OmniLight3D
+	var light := _bonfire.get_node("Fire/BonfireLight") as OmniLight3D
+	var fire_light := light.get_node("Flicker")
 	var tween := create_tween()
+	tween.tween_property(fire_light, ^"ignition", 1.0, 1.2).set_trans(Tween.TRANS_SINE)
+	tween.parallel().tween_property(light, ^"omni_range", 9.5, 1.2)
+
+
+## An unlit bonfire smoulders: the same fire at a seventh of its strength.
+func _attach_bonfire_fire() -> void:
+	var light := _bonfire.get_node("Fire/BonfireLight") as OmniLight3D
 	# A hot pool around the fire with a hard falloff, so the clearing's edge stays moonlit blue.
 	light.omni_attenuation = 1.6
-	tween.tween_property(light, ^"light_energy", 9.0, 1.2).set_trans(Tween.TRANS_SINE)
-	tween.parallel().tween_property(light, ^"omni_range", 9.5, 1.2)
-	if not light.has_node("Flicker"):
-		var flicker := Node.new()
-		flicker.name = "Flicker"
-		flicker.set_script(preload("res://scenes/fx/lamp_flicker.gd"))
-		tween.tween_callback(light.add_child.bind(flicker))
+	var fire_light := preload("res://scenes/fx/fire_light.gd").new()
+	fire_light.name = "Flicker"
+	fire_light.profile = &"bonfire"
+	light.add_child(fire_light)
+	fire_light.set_base_energy(9.0)
+	fire_light.ignition = 0.13

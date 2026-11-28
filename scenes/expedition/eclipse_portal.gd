@@ -16,6 +16,11 @@ const REACH := 3.2
 
 var player: Node3D
 var is_open := false
+## The host says whether the far side can take the player now (entry ready). The prompt and the
+## action use the same check.
+var destination_ready: Callable = func() -> bool: return true
+## Set once the player steps in, so repeated presses do not start a second crossing.
+var locked := false
 var amount: float:
 	set(value):
 		amount = value
@@ -73,7 +78,17 @@ func open(duration: float = 3.2) -> void:
 
 
 func can_enter() -> bool:
-	return is_open and amount > 0.6 and is_instance_valid(player) and to_local(player.global_position).distance_to(THRESHOLD) < REACH
+	if locked or not is_open or amount < 0.6 or not is_instance_valid(player):
+		return false
+	var combat := player.get_node_or_null(^"Combat")
+	if combat != null and (combat.health <= 0.0 or combat.action == &"dead"):
+		return false
+	return to_local(player.global_position).distance_to(THRESHOLD) < REACH and bool(destination_ready.call())
+
+
+## A crossing that could not finish (the hero died, the far side went away) frees the portal.
+func unlock() -> void:
+	locked = false
 
 
 func _process(_delta: float) -> void:
@@ -83,6 +98,7 @@ func _process(_delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"interact") and can_enter():
 		get_viewport().set_input_as_handled()
+		locked = true
 		entered.emit()
 
 

@@ -7,7 +7,7 @@ extends RefCounted
 const MOON := Color(0.52, 0.74, 1.0)
 const LANTERN := Color(1.0, 0.66, 0.26)
 const NEON := Color(1.0, 0.24, 0.62)
-const FlickerScript := preload("res://scenes/fx/lamp_flicker.gd")
+const FireLight := preload("res://scenes/fx/fire_light.gd")
 
 
 ## Relights an area. accents: world-space points for magenta neon fills.
@@ -29,9 +29,10 @@ static func apply(root: Node, accents: Array = []) -> void:
 		lamp.omni_attenuation = 0.9
 		lamp.shadow_enabled = false
 		if not lamp.has_node("Flicker"):
-			var flicker := Node.new()
+			# One component owns the light's energy: flicker, gust dips, drift, flame lean.
+			var flicker := FireLight.new()
 			flicker.name = "Flicker"
-			flicker.set_script(FlickerScript)
+			flicker.profile = &"lantern" if lamp.name.begins_with("Lamp") else &"torch"
 			lamp.add_child(flicker)
 	for i in accents.size():
 		var neon := OmniLight3D.new()

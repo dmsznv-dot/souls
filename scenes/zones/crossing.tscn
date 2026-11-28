@@ -1,0 +1,190 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/zones/zone_standalone.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/zones/crossing_area.tscn" id="2_area"]
+[ext_resource type="PackedScene" path="res://scenes/duel/duel_player.tscn" id="3_player"]
+[ext_resource type="PackedScene" path="res://scenes/duel/audio/duel_audio.tscn" id="4_audio"]
+
+[sub_resource type="StyleBoxFlat" id="Track"]
+bg_color = Color(0.05, 0.05, 0.065, 0.94)
+
+[sub_resource type="StyleBoxFlat" id="Vitality"]
+bg_color = Color(0.69, 0.31, 0.25, 1)
+
+[sub_resource type="StyleBoxFlat" id="Stamina"]
+bg_color = Color(0.39, 0.72, 0.57, 1)
+
+[sub_resource type="StyleBoxFlat" id="Panel"]
+bg_color = Color(0.053, 0.054, 0.071, 0.94)
+border_width_top = 1
+border_width_bottom = 1
+border_color = Color(0.69, 0.53, 0.32, 1)
+content_margin_left = 26.0
+content_margin_top = 10.0
+content_margin_right = 26.0
+content_margin_bottom = 10.0
+
+[node name="FloodedCrossing" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Area" parent="." instance=ExtResource("2_area")]
+
+[node name="Player" parent="." instance=ExtResource("3_player")]
+position = Vector3(0, 3, 6)
+
+[node name="Audio" parent="." instance=ExtResource("4_audio")]
+
+[node name="Interface" type="CanvasLayer" parent="."]
+
+[node name="Status" type="VBoxContainer" parent="Interface"]
+offset_left = 24.0
+offset_top = 20.0
+offset_right = 242.0
+offset_bottom = 82.0
+mouse_filter = 2
+
+[node name="Opponent" type="VBoxContainer" parent="Interface"]
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -147.0
+offset_top = 20.0
+offset_right = 147.0
+offset_bottom = 74.0
+mouse_filter = 2
+
+[node name="GroupStatus" type="Label" parent="Interface/Status"]
+unique_name_in_owner = true
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.89, 0.78, 1)
+theme_override_colors/font_shadow_color = Color(0.03, 0.03, 0.045, 0.94)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 15
+text = ""
+horizontal_alignment = 0
+
+[node name="Vitality" type="ProgressBar" parent="Interface/Status"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 9)
+mouse_filter = 2
+theme_override_styles/background = SubResource("Track")
+theme_override_styles/fill = SubResource("Vitality")
+show_percentage = false
+value = 100.0
+accessibility_name = "Health"
+
+[node name="Stamina" type="ProgressBar" parent="Interface/Status"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 7)
+mouse_filter = 2
+theme_override_styles/background = SubResource("Track")
+theme_override_styles/fill = SubResource("Stamina")
+show_percentage = false
+value = 100.0
+accessibility_name = "Stamina"
+
+[node name="OpponentName" type="Label" parent="Interface/Opponent"]
+unique_name_in_owner = true
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.89, 0.78, 1)
+theme_override_colors/font_shadow_color = Color(0.03, 0.03, 0.045, 0.94)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 19
+text = ""
+horizontal_alignment = 1
+
+[node name="OpponentHealth" type="ProgressBar" parent="Interface/Opponent"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 8)
+mouse_filter = 2
+theme_override_styles/background = SubResource("Track")
+theme_override_styles/fill = SubResource("Vitality")
+show_percentage = false
+value = 100.0
+accessibility_name = "Opponent health"
+
+[node name="Notice" type="Label" parent="Interface"]
+unique_name_in_owner = true
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = -240.0
+offset_right = 240.0
+offset_top = -96.0
+offset_bottom = -63.0
+visible = false
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.89, 0.78, 1)
+theme_override_colors/font_shadow_color = Color(0.03, 0.03, 0.045, 0.94)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 20
+text = ""
+horizontal_alignment = 1
+[node name="Controls" type="PanelContainer" parent="Interface"]
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = -470.0
+offset_right = 470.0
+offset_top = -52.0
+offset_bottom = -16.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("Panel")
+
+[node name="Keys" type="Label" parent="Interface/Controls"]
+unique_name_in_owner = true
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.89, 0.78, 1)
+theme_override_colors/font_shadow_color = Color(0.03, 0.03, 0.045, 0.94)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 14
+text = "WASD  Move  ·  LMB / R  Attack  ·  RMB / Q  Guard / Parry  ·  Space / F  Dodge / Jump  ·  Shift  Sprint  ·  Tab  Weapon  ·  T  Retry"
+horizontal_alignment = 1
+
+[node name="Result" type="PanelContainer" parent="Interface"]
+unique_name_in_owner = true
+visible = false
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = -248.0
+offset_right = 248.0
+offset_top = -57.0
+offset_bottom = 57.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("Panel")
+
+[node name="Messages" type="VBoxContainer" parent="Interface/Result"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="ResultTitle" type="Label" parent="Interface/Result/Messages"]
+unique_name_in_owner = true
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.89, 0.78, 1)
+theme_override_colors/font_shadow_color = Color(0.03, 0.03, 0.045, 0.94)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 30
+text = ""
+horizontal_alignment = 1
+
+[node name="Retry" type="Label" parent="Interface/Result/Messages"]
+unique_name_in_owner = true
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.96, 0.89, 0.78, 1)
+theme_override_colors/font_shadow_color = Color(0.03, 0.03, 0.045, 0.94)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 16
+text = "T / Menu   Rise again"
+horizontal_alignment = 1

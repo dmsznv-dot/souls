@@ -21,6 +21,8 @@ const ROAD_POINTS := [Vector3(0, 0, 18), Vector3(0, 0, 4), Vector3(3, 0, -18), V
 const CLEARING := Vector3(0, 0, -216)
 const CLEARING_RADIUS := 13.0
 const ROAD_HALF := 1.7
+## Half width of the opening south out of the clearing toward the Flooded Crossing.
+const EXIT_HALF := 3.0
 ## Trees keep this far from the road's centre line.
 const ROAD_CLEAR := 4.2
 
@@ -145,6 +147,9 @@ func _exact_height(x: float, z: float) -> float:
 	h = lerpf(h, _road_y[_index(z)], 1.0 - smoothstep(3.0, 9.0, d))
 	var to_clearing := Vector2(x - CLEARING.x, z - CLEARING.z).length()
 	h = lerpf(h, _clearing_y, 1.0 - smoothstep(CLEARING_RADIUS, CLEARING_RADIUS + 6.0, to_clearing))
+	# The way south out of the clearing to the crossing, level with it.
+	if z < CLEARING.z:
+		h = lerpf(h, _clearing_y, 1.0 - smoothstep(EXIT_HALF, EXIT_HALF + 4.0, absf(x - CLEARING.x)))
 	return h
 
 
@@ -270,7 +275,9 @@ func _bounds(root: Node3D) -> void:
 	var size := MAX - MIN
 	for wall in [[Vector3(MIN.x + 2.0, 4, (MIN.y + MAX.y) * 0.5), Vector3(1, 14, size.y)],
 			[Vector3(MAX.x - 2.0, 4, (MIN.y + MAX.y) * 0.5), Vector3(1, 14, size.y)],
-			[Vector3((MIN.x + MAX.x) * 0.5, 4, MIN.y + 2.0), Vector3(size.x, 14, 1)],
+			# The south wall leaves a gap below the clearing: the way to the crossing.
+			[Vector3((MIN.x + CLEARING.x - EXIT_HALF) * 0.5, 4, MIN.y + 2.0), Vector3(CLEARING.x - EXIT_HALF - MIN.x, 14, 1)],
+			[Vector3((CLEARING.x + EXIT_HALF + MAX.x) * 0.5, 4, MIN.y + 2.0), Vector3(MAX.x - CLEARING.x - EXIT_HALF, 14, 1)],
 			[Vector3((MIN.x + MAX.x) * 0.5, 4, MAX.y - 1.0), Vector3(size.x, 14, 1)]]:
 		var shape := BoxShape3D.new()
 		shape.size = wall[1]
@@ -308,8 +315,11 @@ func _vegetation(root: Node3D, chunks: Dictionary) -> void:
 		"log": [Props.log_mesh(12)],
 		"caps": [Props.mushrooms(13)],
 	}
-	var fern_material := Props.vertex_material()
-	fern_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# Firs, oaks and ferns sway (foliage_wind.gdshader); snags, rocks and logs stay put.
+	var fir_wind := _wind_material(9.0, 0.14)
+	var oak_wind := _wind_material(6.5, 0.12)
+	var fern_material := _wind_material(0.6, 0.05)
+	_wind_materials = [fir_wind, oak_wind, fern_material]
 	var glow := Props.vertex_material()
 	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	# chunk -> mesh -> [transforms, colours]
@@ -327,10 +337,15 @@ func _vegetation(root: Node3D, chunks: Dictionary) -> void:
 				var kind := "fir" if roll < 0.62 else ("oak" if roll < 0.88 else "snag")
 				var meshes: Array = kinds[kind]
 				var scale := _rng.randf_range(0.8, 1.35)
-				_place(placed, meshes[_rng.randi() % meshes.size()], px, pz, scale, _rng.randf() * TAU,
-						Color(1, 1, 1).darkened(_rng.randf_range(0.0, 0.3)))
-				var radius := (0.26 if kind == "fir" else (0.42 if kind == "oak" else 0.3)) * scale
-				_solid_trunk(solids, px, pz, radius)
+				var mesh: Mesh = meshes[_rng.randi() % meshes.size()]
+				var yaw := _rng.randf() * TAU
+				var tint := Color(1, 1, 1).darkened(_rng.randf_range(0.0, 0.3))
+				# Authored spots clear trees after the draws, so every other tree keeps its place.
+				if not excluded(px, pz):
+					var material: Material = fir_wind if kind == "fir" else (oak_wind if kind == "oak" else null)
+					_place(placed, mesh, px, pz, scale, yaw, tint, material)
+					var radius := (0.26 if kind == "fir" else (0.42 if kind == "oak" else 0.3)) * scale
+					_solid_trunk(solids, px, pz, radius)
 			z += spacing
 		x += spacing
 		await _pace()
@@ -344,21 +359,41 @@ func _vegetation(root: Node3D, chunks: Dictionary) -> void:
 		if d < ROAD_HALF + 0.6:
 			continue
 		var roll := _rng.randf()
+		# Every branch makes its usual draws first; authored spots then just skip placing, so
+		# the rest of the undergrowth keeps its layout.
+		var clear := not excluded(px, pz, 0.6)
 		if roll < 0.45:
-			_place(placed, kinds["fern"][0], px, pz, _rng.randf_range(0.7, 1.4), _rng.randf() * TAU, Color.WHITE.darkened(_rng.randf_range(0, 0.25)), fern_material)
+			var scale := _rng.randf_range(0.7, 1.4)
+			var yaw := _rng.randf() * TAU
+			var tint := Color.WHITE.darkened(_rng.randf_range(0, 0.25))
+			if clear:
+				_place(placed, kinds["fern"][0], px, pz, scale, yaw, tint, fern_material)
 		elif roll < 0.8:
-			_place(placed, kinds["bush"][0], px, pz, _rng.randf_range(0.7, 1.5), _rng.randf() * TAU, Color.WHITE.darkened(_rng.randf_range(0, 0.3)))
+			var mesh: Mesh = kinds["bush"][0]
+			var scale := _rng.randf_range(0.7, 1.5)
+			var yaw := _rng.randf() * TAU
+			var tint := Color.WHITE.darkened(_rng.randf_range(0, 0.3))
+			if clear:
+				_place(placed, mesh, px, pz, scale, yaw, tint)
 		elif roll < 0.9 and d > 3.0:
-			_place(placed, kinds["caps"][0], px, pz, _rng.randf_range(0.8, 1.4), _rng.randf() * TAU, Color.WHITE, glow)
+			var mesh: Mesh = kinds["caps"][0]
+			var scale := _rng.randf_range(0.8, 1.4)
+			var yaw := _rng.randf() * TAU
+			if clear:
+				_place(placed, mesh, px, pz, scale, yaw, Color.WHITE, glow)
 		elif roll < 0.97:
 			var scale := _rng.randf_range(0.5, 1.6)
-			_place(placed, kinds["rock"][0], px, pz, scale, _rng.randf() * TAU, Color.WHITE.darkened(_rng.randf_range(0, 0.2)))
-			if scale > 1.0 and d > 3.0:
-				_solid_trunk(solids, px, pz, 0.75 * scale)
+			var yaw := _rng.randf() * TAU
+			var tint := Color.WHITE.darkened(_rng.randf_range(0, 0.2))
+			if clear:
+				_place(placed, kinds["rock"][0], px, pz, scale, yaw, tint)
+				if scale > 1.0 and d > 3.0:
+					_solid_trunk(solids, px, pz, 0.75 * scale)
 		elif d > 4.0:
 			var yaw := _rng.randf() * TAU
-			_place(placed, kinds["log"][0], px, pz, 1.0, yaw, Color.WHITE)
-			_solid_log(solids, px, pz, yaw)
+			if clear:
+				_place(placed, kinds["log"][0], px, pz, 1.0, yaw, Color.WHITE)
+				_solid_log(solids, px, pz, yaw)
 	var growth := {}
 	for key: Array in placed.keys():
 		if not growth.has(key[0]):
@@ -371,14 +406,22 @@ func _vegetation(root: Node3D, chunks: Dictionary) -> void:
 		var multimesh := MultiMesh.new()
 		multimesh.transform_format = MultiMesh.TRANSFORM_3D
 		multimesh.use_colors = true
+		# Custom data must be enabled before the instance count is set.
+		multimesh.use_custom_data = true
 		multimesh.mesh = key[1]
 		multimesh.instance_count = entry[0].size()
 		for i in entry[0].size():
+			var at: Vector3 = entry[0][i].origin
 			multimesh.set_instance_transform(i, entry[0][i])
 			multimesh.set_instance_color(i, entry[1][i])
+			# Sway phase from the position, not from the placement RNG.
+			multimesh.set_instance_custom_data(i, Color(fposmod(sin(at.x * 12.9898 + at.z * 78.233) * 43758.5453, 1.0), 0, 0, 0))
 		var instance := MultiMeshInstance3D.new()
 		instance.multimesh = multimesh
 		instance.material_override = key[2]
+		if key[2] in _wind_materials:
+			# Swaying crowns reach past the batch's bounds: keep them from popping at the edge.
+			instance.extra_cull_margin = 0.35
 		await _pace()
 		var tall: bool = key[1] in kinds["fir"] or key[1] in kinds["oak"] or key[1] in kinds["snag"]
 		if not tall:
@@ -407,6 +450,24 @@ func _chunk_of(x: float, z: float) -> Vector2i:
 
 
 var _default_material: StandardMaterial3D
+var _wind_materials: Array = []
+## Authored spots kept clear of generated growth: Vector3(x, z, radius).
+var exclusions: Array[Vector3] = []
+
+
+func excluded(x: float, z: float, margin: float = 0.0) -> bool:
+	for zone in exclusions:
+		if Vector2(x - zone.x, z - zone.y).length() < zone.z + margin:
+			return true
+	return false
+
+
+func _wind_material(bend_height: float, amplitude: float) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://scenes/forest/foliage_wind.gdshader")
+	material.set_shader_parameter(&"bend_height_m", bend_height)
+	material.set_shader_parameter(&"amplitude_m", amplitude)
+	return material
 
 
 func _place(placed: Dictionary, mesh: Mesh, x: float, z: float, scale: float, yaw: float, tint: Color, material: Material = null) -> void:
